@@ -44,6 +44,7 @@ RPG_Client/x64/
 *.filters
 *.user
 .vs/
+x64/
 
 #MMO_Server
 lua54.lib
