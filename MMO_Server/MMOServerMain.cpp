@@ -137,10 +137,10 @@ public:
 		}
 		_vl.unlock();
 
-		SC_REMOVE_PLAYER_PACKET p;
+		SC_REMOVE_OBJECT_PACKET p;
 		p.id = c_id;
 		p.size = sizeof(p);
-		p.type = SC_REMOVE_PLAYER;
+		p.type = SC_REMOVE_OBJECT;
 		do_send(&p);
 	}
 };
@@ -179,10 +179,10 @@ bool is_moving(int from, int to)
 
 void SESSION::send_move_packet(int c_id)
 {
-	SC_MOVE_PLAYER_PACKET p;
+	SC_MOVE_OBJECT_PACKET p;
 	p.id = c_id;
-	p.size = sizeof(SC_MOVE_PLAYER_PACKET);
-	p.type = SC_MOVE_PLAYER;
+	p.size = sizeof(SC_MOVE_OBJECT_PACKET);
+	p.type = SC_MOVE_OBJECT;
 	p.x = clients[c_id].x;
 	p.y = clients[c_id].y;
 	p.move_time = clients[c_id].last_move_time;
@@ -191,11 +191,11 @@ void SESSION::send_move_packet(int c_id)
 
 void SESSION::send_add_player_packet(int c_id)
 {
-	SC_ADD_PLAYER_PACKET add_packet;
+	SC_ADD_OBJECT_PACKET add_packet;
 	add_packet.id = c_id;
 	strcpy_s(add_packet.name, clients[c_id]._name);
 	add_packet.size = sizeof(add_packet);
-	add_packet.type = SC_ADD_PLAYER;
+	add_packet.type = SC_ADD_OBJECT;
 	add_packet.x = clients[c_id].x;
 	add_packet.y = clients[c_id].y;
 	_vl.lock();
@@ -642,7 +642,7 @@ void InitializeNPC()
 		lua_getglobal(L, "set_uid");
 		lua_pushnumber(L, i);
 		lua_pcall(L, 1, 0, 0);
-		lua_pop(L, 1);// eliminate set_uid from stack after call
+		lua_pop(L, 1);
 
 		lua_register(L, "API_get_x", API_get_x);
 		lua_register(L, "API_get_y", API_get_y);
@@ -704,15 +704,20 @@ void do_timer()
 int main()
 {
 	WSADATA WSAData;
-	WSAStartup(MAKEWORD(2, 2), &WSAData);
+	int err = WSAStartup(MAKEWORD(2, 2), &WSAData);
+
 	g_s_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
+
 	SOCKADDR_IN server_addr;
 	memset(&server_addr, 0, sizeof(server_addr));
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_port = htons(PORT_NUM);
 	server_addr.sin_addr.S_un.S_addr = INADDR_ANY;
+
 	bind(g_s_socket, reinterpret_cast<sockaddr*>(&server_addr), sizeof(server_addr));
+
 	listen(g_s_socket, SOMAXCONN);
+
 	SOCKADDR_IN cl_addr;
 	int addr_size = sizeof(cl_addr);
 
@@ -722,7 +727,8 @@ int main()
 	CreateIoCompletionPort(reinterpret_cast<HANDLE>(g_s_socket), h_iocp, 9999, 0);
 	g_c_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
 	g_a_over._comp_type = OP_ACCEPT;
-	AcceptEx(g_s_socket, g_c_socket, g_a_over._send_buf, 0, addr_size + 16, addr_size + 16, 0, &g_a_over._over);
+
+	err = AcceptEx(g_s_socket, g_c_socket, g_a_over._send_buf, 0, addr_size + 16, addr_size + 16, 0, &g_a_over._over);
 
 	vector <thread> worker_threads;
 	int num_threads = std::thread::hardware_concurrency();
@@ -734,6 +740,7 @@ int main()
 	timer_thread.join();
 	for (auto& th : worker_threads)
 		th.join();
+
 	closesocket(g_s_socket);
 	WSACleanup();
 }
