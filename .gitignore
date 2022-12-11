@@ -43,6 +43,7 @@ RPG_Client/x64/
 *.vcxproj
 *.filters
 *.user
+.vs/
 
 #MMO_Server
 lua54.lib
