@@ -113,6 +113,15 @@ OBJECT black_tile;
 sf::Texture* board;
 sf::Texture* pieces;
 
+void quit_err(const char* err_msg) {
+	printf("err: %s", err_msg);
+	exit(true);
+}
+
+void display_err(const char* err_msg) {
+	printf("err: %s", err_msg);
+}
+
 void client_initialize()
 {
 	board = new sf::Texture;
@@ -303,16 +312,16 @@ void send_packet(void *packet)
 
 int main()
 {
-	wcout.imbue(locale("korean"));
+	wcout.imbue(locale("Korean"));
 	sf::Socket::Status status = s_socket.connect("127.0.0.1", PORT_NUM);
 	s_socket.setBlocking(false);
 
 	if (status != sf::Socket::Done) {
-		wcout << L"서버와 연결할 수 없습니다.\n";
-		exit(-1);
+		quit_err("서버와 연결할 수 없습니다.\n");
 	}
 
 	client_initialize();
+
 	CS_LOGIN_PACKET p;
 	p.size = sizeof(p);
 	p.type = CS_LOGIN;
