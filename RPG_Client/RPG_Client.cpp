@@ -48,6 +48,8 @@ void network_module() {
 		}
 	}
 
+	cout << "입력받은 ID: " << user_id << endl;
+
 	CS_LOGIN_PACKET p;
 	p.size = sizeof(p);
 	p.type = CS_LOGIN;
@@ -91,18 +93,20 @@ int main()
 				window.close();
 				break;
 			case sf::Event::KeyPressed:
+			{
+				int direction = -1;
 				switch (event.key.code) {
 				case sf::Keyboard::Left:
-
+					direction = 4;
 					break;
 				case sf::Keyboard::Right:
-
+					direction = 2;
 					break;
 				case sf::Keyboard::Up:
-
+					direction = 1;
 					break;
 				case sf::Keyboard::Down:
-
+					direction = 3;
 					break;
 				case sf::Keyboard::BackSpace:
 					if (!user_id.empty() && current_stage == 0) {
@@ -111,17 +115,23 @@ int main()
 					}
 					break;
 				case sf::Keyboard::Return:
-					if (current_stage == 0) {
-						connect_net = true;
-					}
+					connect_net = true;
 					break;
 				case sf::Keyboard::Escape:
-					connect_net = false;
 					net.join();
 					window.close();
 					break;
 				}
-				break;
+				if (-1 != direction) {
+					CS_MOVE_PACKET p;
+					p.size = sizeof(p);
+					p.type = CS_MOVE;
+					p.direction = direction;
+					send_packet(&p);
+					cout << direction << endl;
+				}
+			}
+			break;
 			case sf::Event::TextEntered:
 				if (event.text.unicode < 128) {
 					if (user_id.size() < 18 && current_stage == 0
@@ -138,7 +148,6 @@ int main()
 		}
 
 		window.clear();
-
 		window.draw(m_sprite);
 		if (!user_id.empty()) {
 			window.draw(text);
