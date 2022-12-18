@@ -424,6 +424,7 @@ void worker_thread(HANDLE h_iocp)
 		WSAOVERLAPPED* over = nullptr;
 		BOOL ret = GetQueuedCompletionStatus(h_iocp, &num_bytes, &key, &over, INFINITE);
 		OVER_EXP* ex_over = reinterpret_cast<OVER_EXP*>(over);
+		
 		// error °ËÃâ±â
 		if (FALSE == ret) {
 			if (ex_over->_comp_type == OP_ACCEPT) cout << "Accept Error";
@@ -434,7 +435,6 @@ void worker_thread(HANDLE h_iocp)
 				continue;
 			}
 		}
-
 		if ((0 == num_bytes) && ((ex_over->_comp_type == OP_RECV) || (ex_over->_comp_type == OP_SEND))) {
 			disconnect(static_cast<int>(key));
 			if (ex_over->_comp_type == OP_SEND) delete ex_over;
@@ -455,8 +455,7 @@ void worker_thread(HANDLE h_iocp)
 				clients[client_id]._name[0] = 0;
 				clients[client_id]._prev_remain = 0;
 				clients[client_id]._socket = g_c_socket;
-				CreateIoCompletionPort(reinterpret_cast<HANDLE>(g_c_socket),
-					h_iocp, client_id, 0);
+				CreateIoCompletionPort(reinterpret_cast<HANDLE>(g_c_socket), h_iocp, client_id, 0);
 				clients[client_id].do_recv();
 				g_c_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
 			}

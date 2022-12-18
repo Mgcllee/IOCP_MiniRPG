@@ -11,6 +11,10 @@ using namespace std;
 
 #include "../MMO_Server/protocol_2022.h"
 
+constexpr auto TILE_SIZE = 42.5;
+constexpr auto MAX_WID_TILE = 23;
+constexpr auto MAX_HEI_TILE = 16;
+
 constexpr auto WINDOW_WIDTH = 1000;
 constexpr auto WINDOW_HEIGHT = 700;
 
@@ -24,7 +28,19 @@ sf::Texture* board;
 sf::Sprite m_sprite;
 string user_id = "\0";
 
+sf::Sprite player_sprite;
+
 sf::TcpSocket g_socket;
+
+void login_page();
+void main_page();
+
+class MAPMgr {
+public:
+	sf::Texture* board;
+	sf::Sprite m_sprite[50][50];
+};
+MAPMgr mapMgr;
 
 void send_packet(void* packet) {
 	unsigned char* p = reinterpret_cast<unsigned char*>(packet);
@@ -55,9 +71,12 @@ void network_module() {
 	p.type = CS_LOGIN;
 	strcpy_s(p.name, user_id.c_str());
 	send_packet(&p);
+
+	main_page();
 }
 
-void login_page() {
+void login_page() 
+{
 	// 언어 설정
 	wcout.imbue(locale("Korean"));
 	// 아이디 입력을 위한 폰트 설정
@@ -73,6 +92,24 @@ void login_page() {
 	m_sprite.setTextureRect(sf::IntRect(0, 0, 1000, 700));
 }
 
+void main_page() {
+	board->loadFromFile("texture\\tileSprite.png");
+
+	for (int hei = 0; hei < MAX_HEI_TILE; ++hei) {
+		for (int wid = 0; wid < MAX_WID_TILE; ++wid) {
+			mapMgr.m_sprite[wid][hei].setTexture(*board);
+			mapMgr.m_sprite[wid][hei].setTextureRect(sf::IntRect(0, 0, TILE_SIZE, TILE_SIZE));
+			mapMgr.m_sprite[wid][hei].setPosition(TILE_SIZE * wid, TILE_SIZE * hei);
+		}
+	}
+
+	board = new sf::Texture;
+	board->loadFromFile("texture\\ChracterSprite.png");
+
+	player_sprite.setTexture(*board);
+	player_sprite.setTextureRect(sf::IntRect(0, 0, 45, 45));
+}
+
 int main()
 {
 	login_page();
@@ -80,7 +117,7 @@ int main()
 	sf::RenderWindow window(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "User Name");
 	g_window = &window;
 
-	thread net{ network_module };
+	thread net_module{ network_module };
 
 	while (window.isOpen())
 	{
@@ -94,19 +131,23 @@ int main()
 				break;
 			case sf::Event::KeyPressed:
 			{
-				int direction = -1;
+				short direction = -1;
 				switch (event.key.code) {
 				case sf::Keyboard::Left:
-					direction = 4;
+					if(connect_net)
+						direction = 4;
 					break;
 				case sf::Keyboard::Right:
-					direction = 2;
+					if (connect_net)
+						direction = 2;
 					break;
 				case sf::Keyboard::Up:
-					direction = 1;
+					if (connect_net)
+						direction = 1;
 					break;
 				case sf::Keyboard::Down:
-					direction = 3;
+					if (connect_net)
+						direction = 3;
 					break;
 				case sf::Keyboard::BackSpace:
 					if (!user_id.empty() && current_stage == 0) {
@@ -116,39 +157,52 @@ int main()
 					break;
 				case sf::Keyboard::Return:
 					connect_net = true;
+					current_stage = 1;
 					break;
 				case sf::Keyboard::Escape:
-					net.join();
 					window.close();
 					break;
 				}
 				if (-1 != direction) {
+					cout << "Direction: " << direction << endl;
 					CS_MOVE_PACKET p;
 					p.size = sizeof(p);
 					p.type = CS_MOVE;
 					p.direction = direction;
 					send_packet(&p);
-					cout << direction << endl;
 				}
 			}
 			break;
 			case sf::Event::TextEntered:
 				if (event.text.unicode < 128) {
 					if (user_id.size() < 18 && current_stage == 0
-						&& (isupper(event.text.unicode) || islower(event.text.unicode) || isdigit(event.text.unicode))) 
+						&& (isupper(event.text.unicode) || islower(event.text.unicode) || isdigit(event.text.unicode)))
 					{
 						user_id.push_back(event.text.unicode);
 						text.setString(user_id);
 					}
 				}
 				break;
-			default:
-				break;
 			}
 		}
 
 		window.clear();
-		window.draw(m_sprite);
+		switch (current_stage)
+		{
+		case 0:
+			window.draw(m_sprite);
+			break;
+		case 1:
+			for (int hei = 0; hei < MAX_HEI_TILE; ++hei) {
+				for (int wid = 0; wid < MAX_WID_TILE; ++wid) {
+					window.draw(mapMgr.m_sprite[wid][hei]);
+				}
+			}
+			window.draw(player_sprite);
+			break;
+		default:
+			break;
+		}
 		if (!user_id.empty()) {
 			window.draw(text);
 		}

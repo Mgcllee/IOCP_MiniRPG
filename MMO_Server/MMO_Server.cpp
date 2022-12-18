@@ -34,8 +34,9 @@ public:
 	WSAOVERLAPPED _over;
 	WSABUF _wsabuf;
 	char _send_buf[BUF_SIZE];
-	TYPE c_type;
+	TYPE c_type = RECV;
 	int _ai_target_obj;
+
 	OVER_EXP()
 	{
 		_wsabuf.len = BUF_SIZE;
@@ -43,43 +44,49 @@ public:
 		c_type = RECV;
 		ZeroMemory(&_over, sizeof(_over));
 	}
-	//OVER_EXP(char* packet)
-	//{
-	//	_wsabuf.len = packet[0];
-	//	_wsabuf.buf = _send_buf;
-	//	ZeroMemory(&_over, sizeof(_over));
-	//	// c_type = OP_SEND;
-	//	memcpy(_send_buf, packet, packet[0]);
-	//}
 };
+
+class SESSION {
+	OVER_EXP _recv_over;
+
+public:
+	SOCKET	_socket;
+	int		_id;
+	short	x, y;
+	char	_name[NAME_SIZE];
+	int		_prev_remain;
+
+	void do_recv()
+	{
+		DWORD recv_flag = 0;
+		memset(&_recv_over._over, 0, sizeof(_recv_over._over));
+		_recv_over._wsabuf.len = BUF_SIZE - _prev_remain;
+		_recv_over._wsabuf.buf = _recv_over._send_buf + _prev_remain;
+		WSARecv(_socket, &_recv_over._wsabuf, 1, 0, &recv_flag, &_recv_over._over, 0);
+	}
+};
+
+array<SESSION, MAX_USER + MAX_NPC> clients;
 
 OVER_EXP g_a_over;
 
-void do_recv()
+void process_packet(int c_id, char* packet) 
 {
-	DWORD recv_flag = 0;
-	memset(&_over, 0, sizeof(_over));
-	_wsabuf.len = BUF_SIZE;
-	_wsabuf.buf = _send_buf;
-	WSARecv(g_c_socket, &_wsabuf, 1, 0, &recv_flag, &_over, 0);
-}
-
-void process_packet(int c_id, char* packet) {
-	
+	cout << "Packet Type: " << (int)packet[1] << endl;
 	switch (packet[1])
 	{
 	case CS_LOGIN:
 	{
 		CS_LOGIN_PACKET* p = reinterpret_cast<CS_LOGIN_PACKET*>(packet);
-		cout << p->name << endl;
+		cout << "process_packet + name: " << p->name << endl;
+		break;
 	}
-	break;
 	case CS_MOVE:
 	{
 		CS_MOVE_PACKET* p = reinterpret_cast<CS_MOVE_PACKET*>(packet);
-		cout << p->direction << endl;
+		cout << "Server Recv Direction: " << (short)p->direction << endl;
+		break;
 	}
-	break;
 	}
 }
 
@@ -91,7 +98,14 @@ void worker_thread(HANDLE h_iocp) {
 		BOOL ret = GetQueuedCompletionStatus(h_iocp, &num_bytes, &key, &over, INFINITE);
 		OVER_EXP* ex_over = reinterpret_cast<OVER_EXP*>(over);
 
-		// Recv를 해야하는데 비어있을 경우
+		// error 검출기
+		if (FALSE == ret) {
+			if (ex_over->c_type == ACCEPT) cout << "Accept Error";
+			else {
+				cout << "GQCS Error on client[" << key << "]\n";
+				continue;
+			}
+		}
 		if ((0 == num_bytes) && (ex_over->c_type == RECV)) {
 			continue;
 		}
@@ -100,19 +114,30 @@ void worker_thread(HANDLE h_iocp) {
 		{
 		case ACCEPT:
 		{
-			CreateIoCompletionPort(reinterpret_cast<HANDLE>(g_c_socket), h_iocp, 0, 0);
-			do_recv();
-			g_c_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
+			int new_c_id = 0;
+			if (new_c_id != -1) {
+				clients[new_c_id].x = 0;
+				clients[new_c_id].y = 0;
+				clients[new_c_id]._id = new_c_id;
+				clients[new_c_id]._socket = g_c_socket;
+				CreateIoCompletionPort(reinterpret_cast<HANDLE>(g_c_socket), h_iocp, new_c_id, 0);
+				clients[new_c_id].do_recv();
+				g_c_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
+				cout << "Accept New Client" << endl;
+			}
+			else {
+				cout << "Accept Error" << endl;
+			}
 			ZeroMemory(&g_a_over._over, sizeof(g_a_over._over));
 			int addr_size = sizeof(SOCKADDR_IN);
 			AcceptEx(g_s_socket, g_c_socket, g_a_over._send_buf, 0, addr_size + 16, addr_size + 16, 0, &g_a_over._over);
-			cout << "Accept New Client" << endl;
 		}
 		break;
 		case RECV:
 		{
-			int remain_data = num_bytes;
-			char* p = _send_buf;
+			cout << "Recv . . .\n";
+			int remain_data = num_bytes + clients[key]._prev_remain;
+			char* p = ex_over->_send_buf;
 			while (remain_data > 0) {
 				int packet_size = p[0];
 				if (packet_size <= remain_data) {
@@ -122,7 +147,11 @@ void worker_thread(HANDLE h_iocp) {
 				}
 				else break;
 			}
-			do_recv();
+			clients[key]._prev_remain = remain_data;
+			if (remain_data > 0) {
+				memcpy(ex_over->_send_buf, p, remain_data);
+			}
+			clients[key].do_recv();
 		}
 		break;
 		}
@@ -149,7 +178,7 @@ int main()
 	int addr_size = sizeof(cl_addr);
 
 	h_iocp = CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 0);
-	CreateIoCompletionPort(reinterpret_cast<HANDLE>(g_s_socket), h_iocp, 0, 0);
+	CreateIoCompletionPort(reinterpret_cast<HANDLE>(g_s_socket), h_iocp, 9999, 0);
 	g_c_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
 	g_a_over.c_type = ACCEPT;
 
