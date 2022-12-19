@@ -11,15 +11,14 @@ using namespace std;
 
 #include "../MMO_Server/protocol_2022.h"
 
-constexpr auto TILE_SIZE = 42.5;
-constexpr auto MAX_WID_TILE = 23;
-constexpr auto MAX_HEI_TILE = 16;
+constexpr auto TILE_SIZE		= 42.5;
+constexpr auto MAX_WID_TILE		= 50;
+constexpr auto MAX_HEI_TILE		= 50;
+constexpr auto WINDOW_WIDTH		= 1000;
+constexpr auto WINDOW_HEIGHT	= 700;
 
-constexpr auto WINDOW_WIDTH = 1000;
-constexpr auto WINDOW_HEIGHT = 700;
-
-short current_stage = 0;
-bool connect_net = false;
+enum STAGE { TITLE, HOME };
+short current_stage = TITLE;
 
 sf::RenderWindow* g_window;
 sf::Font g_font;
@@ -38,7 +37,7 @@ void main_page();
 class MAPMgr {
 public:
 	sf::Texture* board;
-	sf::Sprite m_sprite[50][50];
+	sf::Sprite m_sprite[MAX_WID_TILE][MAX_HEI_TILE];
 };
 MAPMgr mapMgr;
 
@@ -59,7 +58,7 @@ void network_module() {
 	}
 
 	while (true) {
-		if (!user_id.empty() && connect_net) {
+		if (!user_id.empty() && (STAGE::HOME == current_stage)) {
 			break;
 		}
 	}
@@ -73,6 +72,52 @@ void network_module() {
 	send_packet(&p);
 
 	main_page();
+}
+
+void ProcessPacket(char* ptr)
+{
+	static bool first_time = true;
+	switch (ptr[1])
+	{
+	case SC_LOGIN_INFO:
+	{
+		SC_LOGIN_INFO_PACKET* packet = reinterpret_cast<SC_LOGIN_INFO_PACKET*>(ptr);
+
+		break;
+	}
+	case SC_MOVE_OBJECT:
+	{
+		SC_MOVE_OBJECT_PACKET* my_packet = reinterpret_cast<SC_MOVE_OBJECT_PACKET*>(ptr);
+		int other_id = my_packet->id;
+		player_sprite.setPosition(my_packet->x * TILE_SIZE, my_packet->y * TILE_SIZE);
+		break;
+	}
+	}
+}
+
+void process_data(char* net_buf, size_t io_byte)
+{
+	char* ptr = net_buf;
+	static size_t in_packet_size = 0;
+	static size_t saved_packet_size = 0;
+	static char packet_buffer[BUF_SIZE];
+
+	while (0 != io_byte) {
+		if (0 == in_packet_size) in_packet_size = ptr[0];
+		if (io_byte + saved_packet_size >= in_packet_size) {
+			memcpy(packet_buffer + saved_packet_size, ptr, in_packet_size - saved_packet_size);
+			ProcessPacket(packet_buffer);
+			ptr += in_packet_size - saved_packet_size;
+			io_byte -= in_packet_size - saved_packet_size;
+			in_packet_size = 0;
+			saved_packet_size = 0;
+		}
+		else {
+			memcpy(packet_buffer + saved_packet_size, ptr, io_byte);
+			saved_packet_size += io_byte;
+			io_byte = 0;
+		}
+	}
 }
 
 void login_page() 
@@ -110,6 +155,44 @@ void main_page() {
 	player_sprite.setTextureRect(sf::IntRect(0, 0, 45, 45));
 }
 
+void client_main() {
+	char net_buf[BUF_SIZE];
+	size_t	received;
+
+	auto recv_result = g_socket.receive(net_buf, BUF_SIZE, received);
+
+	if (recv_result == sf::Socket::Error)
+	{
+		wcout << L"Recv ¿¡·¯!";
+		exit(-1);
+	}
+	if (recv_result == sf::Socket::Disconnected) {
+		wcout << L"Disconnected\n";
+		exit(-1);
+	}
+	if (recv_result != sf::Socket::NotReady)
+		if (received > 0) process_data(net_buf, received);
+
+}
+
+void DrawMap(sf::RenderWindow& window) {
+	switch (current_stage)
+	{
+	case STAGE::TITLE:
+		window.draw(m_sprite);
+		window.draw(text);
+		break;
+	case STAGE::HOME:
+		for (int hei = 0; hei < MAX_HEI_TILE; ++hei) {
+			for (int wid = 0; wid < MAX_WID_TILE; ++wid) {
+				window.draw(mapMgr.m_sprite[wid][hei]);
+			}
+		}
+		window.draw(player_sprite);
+		break;
+	}
+}
+
 int main()
 {
 	login_page();
@@ -133,38 +216,36 @@ int main()
 			{
 				short direction = -1;
 				switch (event.key.code) {
-				case sf::Keyboard::Left:
-					if(connect_net)
-						direction = 4;
+				case sf::Keyboard::Up:
+					if (STAGE::HOME == current_stage)
+						direction = 0;
 					break;
 				case sf::Keyboard::Right:
-					if (connect_net)
-						direction = 2;
-					break;
-				case sf::Keyboard::Up:
-					if (connect_net)
+					if (STAGE::HOME == current_stage)
 						direction = 1;
 					break;
 				case sf::Keyboard::Down:
-					if (connect_net)
+					if (STAGE::HOME == current_stage)
+						direction = 2;
+					break;
+				case sf::Keyboard::Left:
+					if(STAGE::HOME == current_stage)
 						direction = 3;
 					break;
 				case sf::Keyboard::BackSpace:
-					if (!user_id.empty() && current_stage == 0) {
+					if (!user_id.empty() && (current_stage == STAGE::TITLE)) {
 						user_id.pop_back();
 						text.setString(user_id);
 					}
 					break;
 				case sf::Keyboard::Return:
-					connect_net = true;
-					current_stage = 1;
+					current_stage = STAGE::HOME;
 					break;
 				case sf::Keyboard::Escape:
 					window.close();
 					break;
 				}
 				if (-1 != direction) {
-					cout << "Direction: " << direction << endl;
 					CS_MOVE_PACKET p;
 					p.size = sizeof(p);
 					p.type = CS_MOVE;
@@ -187,25 +268,8 @@ int main()
 		}
 
 		window.clear();
-		switch (current_stage)
-		{
-		case 0:
-			window.draw(m_sprite);
-			break;
-		case 1:
-			for (int hei = 0; hei < MAX_HEI_TILE; ++hei) {
-				for (int wid = 0; wid < MAX_WID_TILE; ++wid) {
-					window.draw(mapMgr.m_sprite[wid][hei]);
-				}
-			}
-			window.draw(player_sprite);
-			break;
-		default:
-			break;
-		}
-		if (!user_id.empty()) {
-			window.draw(text);
-		}
+		client_main();
+		DrawMap(window);
 		window.display();
 	}
 

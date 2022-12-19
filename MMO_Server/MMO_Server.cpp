@@ -28,7 +28,7 @@ char _send_buf[BUF_SIZE];
 WSABUF _wsabuf;
 WSAOVERLAPPED _over{};
 
-enum TYPE { ACCEPT, RECV };
+enum TYPE { ACCEPT, RECV, SEND };
 class OVER_EXP {
 public:
 	WSAOVERLAPPED _over;
@@ -43,6 +43,14 @@ public:
 		_wsabuf.buf = _send_buf;
 		c_type = RECV;
 		ZeroMemory(&_over, sizeof(_over));
+	}
+	OVER_EXP(char* packet)
+	{
+		_wsabuf.len = packet[0];
+		_wsabuf.buf = _send_buf;
+		ZeroMemory(&_over, sizeof(_over));
+		c_type = SEND;
+		memcpy(_send_buf, packet, packet[0]);
 	}
 };
 
@@ -64,15 +72,35 @@ public:
 		_recv_over._wsabuf.buf = _recv_over._send_buf + _prev_remain;
 		WSARecv(_socket, &_recv_over._wsabuf, 1, 0, &recv_flag, &_recv_over._over, 0);
 	}
+
+	void do_send(void* packet)
+	{
+		OVER_EXP* sdata = new OVER_EXP{ reinterpret_cast<char*>(packet) };
+		WSASend(_socket, &sdata->_wsabuf, 1, 0, 0, &sdata->_over, 0);
+	}
+
+	void send_move_packet(int c_id);
 };
 
 array<SESSION, MAX_USER + MAX_NPC> clients;
 
+void SESSION::send_move_packet(int c_id)
+{
+	SC_MOVE_OBJECT_PACKET p;
+	p.id = c_id;
+	p.size = sizeof(SC_MOVE_OBJECT_PACKET);
+	p.type = SC_MOVE_OBJECT;
+	p.x = clients[c_id].x;
+	p.y = clients[c_id].y;
+	do_send(&p);
+}
+
+
 OVER_EXP g_a_over;
 
+enum DIRECTION { UP, RIGHT, DOWN, LEFT };
 void process_packet(int c_id, char* packet) 
 {
-	cout << "Packet Type: " << (int)packet[1] << endl;
 	switch (packet[1])
 	{
 	case CS_LOGIN:
@@ -84,7 +112,15 @@ void process_packet(int c_id, char* packet)
 	case CS_MOVE:
 	{
 		CS_MOVE_PACKET* p = reinterpret_cast<CS_MOVE_PACKET*>(packet);
-		cout << "Server Recv Direction: " << (short)p->direction << endl;
+		switch (p->direction)
+		{
+		case DIRECTION::UP:		--clients[c_id].y;	break;
+		case DIRECTION::RIGHT:	++clients[c_id].x;	break;
+		case DIRECTION::DOWN:	++clients[c_id].y;	break;
+		case DIRECTION::LEFT:	--clients[c_id].x;	break;
+		}
+
+		clients[c_id].send_move_packet(c_id);
 		break;
 	}
 	}
@@ -135,7 +171,6 @@ void worker_thread(HANDLE h_iocp) {
 		break;
 		case RECV:
 		{
-			cout << "Recv . . .\n";
 			int remain_data = num_bytes + clients[key]._prev_remain;
 			char* p = ex_over->_send_buf;
 			while (remain_data > 0) {
