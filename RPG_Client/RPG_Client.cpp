@@ -152,7 +152,7 @@ void main_page() {
 	board->loadFromFile("texture\\ChracterSprite.png");
 
 	player_sprite.setTexture(*board);
-	player_sprite.setTextureRect(sf::IntRect(0, 0, 45, 45));
+	player_sprite.setTextureRect(sf::IntRect(0, 0, 42, 42));
 }
 
 void client_main() {

@@ -1,104 +1,24 @@
-#include <iostream>
-#include <array>
-#include <WS2tcpip.h>
-#include <MSWSock.h>
-#include <thread>
-#include <vector>
-#include <mutex>
-#include <unordered_set>
-#include <concurrent_priority_queue.h>
-#include "protocol_2022.h"
-
-extern "C"
-{
-#include "include/lua.h"
-#include "include/lauxlib.h"
-#include "include/lualib.h"
-}
-#pragma comment (lib, "lua54.lib")
-
-#pragma comment(lib, "WS2_32.lib")
-#pragma comment(lib, "MSWSock.lib")
-using namespace std;
+#pragma once
+#include "stdafx.h"
 
 HANDLE h_iocp;
 SOCKET g_s_socket, g_c_socket;
 
-char _send_buf[BUF_SIZE];
-WSABUF _wsabuf;
-WSAOVERLAPPED _over{};
-
-enum TYPE { ACCEPT, RECV, SEND };
-class OVER_EXP {
-public:
-	WSAOVERLAPPED _over;
-	WSABUF _wsabuf;
-	char _send_buf[BUF_SIZE];
-	TYPE c_type = RECV;
-	int _ai_target_obj;
-
-	OVER_EXP()
-	{
-		_wsabuf.len = BUF_SIZE;
-		_wsabuf.buf = _send_buf;
-		c_type = RECV;
-		ZeroMemory(&_over, sizeof(_over));
-	}
-	OVER_EXP(char* packet)
-	{
-		_wsabuf.len = packet[0];
-		_wsabuf.buf = _send_buf;
-		ZeroMemory(&_over, sizeof(_over));
-		c_type = SEND;
-		memcpy(_send_buf, packet, packet[0]);
-	}
-};
-
-class SESSION {
-	OVER_EXP _recv_over;
-
-public:
-	SOCKET	_socket;
-	int		_id;
-	short	x, y;
-	char	_name[NAME_SIZE];
-	int		_prev_remain;
-
-	void do_recv()
-	{
-		DWORD recv_flag = 0;
-		memset(&_recv_over._over, 0, sizeof(_recv_over._over));
-		_recv_over._wsabuf.len = BUF_SIZE - _prev_remain;
-		_recv_over._wsabuf.buf = _recv_over._send_buf + _prev_remain;
-		WSARecv(_socket, &_recv_over._wsabuf, 1, 0, &recv_flag, &_recv_over._over, 0);
-	}
-
-	void do_send(void* packet)
-	{
-		OVER_EXP* sdata = new OVER_EXP{ reinterpret_cast<char*>(packet) };
-		WSASend(_socket, &sdata->_wsabuf, 1, 0, 0, &sdata->_over, 0);
-	}
-
-	void send_move_packet(int c_id);
-};
-
 array<SESSION, MAX_USER + MAX_NPC> clients;
-
-void SESSION::send_move_packet(int c_id)
-{
-	SC_MOVE_OBJECT_PACKET p;
-	p.id = c_id;
-	p.size = sizeof(SC_MOVE_OBJECT_PACKET);
-	p.type = SC_MOVE_OBJECT;
-	p.x = clients[c_id].x;
-	p.y = clients[c_id].y;
-	do_send(&p);
-}
-
-
 OVER_EXP g_a_over;
 
-enum DIRECTION { UP, RIGHT, DOWN, LEFT };
+int get_player_number() {
+	// User index 범위 내에서 name이 default값인 empty 로 되어 있는 것 찾기
+	for (int i = 0; i < MAX_USER; ++i) {
+		if (0 == strcmp(clients[i]._name, "empty")) {
+			return i;
+			break;
+		}
+		continue;
+	}
+	return -1;
+}
+
 void process_packet(int c_id, char* packet) 
 {
 	switch (packet[1])
@@ -106,23 +26,64 @@ void process_packet(int c_id, char* packet)
 	case CS_LOGIN:
 	{
 		CS_LOGIN_PACKET* p = reinterpret_cast<CS_LOGIN_PACKET*>(packet);
-		cout << "process_packet + name: " << p->name << endl;
-		break;
+		cout << "input Login name: " << p->name << endl;
+		
+		
+		
+		int new_client_id = get_player_number();
+		if (-1 == new_client_id) {
+			// Login Fail
+
+		}
+		else {
+			strncpy_s(clients[new_client_id]._name, p->name, strlen(p->name));
+		}
 	}
+	break;
 	case CS_MOVE:
 	{
 		CS_MOVE_PACKET* p = reinterpret_cast<CS_MOVE_PACKET*>(packet);
+		
+		short x = clients[c_id].x;
+		short y = clients[c_id].y;
 		switch (p->direction)
 		{
-		case DIRECTION::UP:		--clients[c_id].y;	break;
-		case DIRECTION::RIGHT:	++clients[c_id].x;	break;
-		case DIRECTION::DOWN:	++clients[c_id].y;	break;
-		case DIRECTION::LEFT:	--clients[c_id].x;	break;
+		case DIRECTION::UP:		--y;	break;
+		case DIRECTION::RIGHT:	++x;	break;
+		case DIRECTION::DOWN:	++y;	break;
+		case DIRECTION::LEFT:	--x;	break;
 		}
 
-		clients[c_id].send_move_packet(c_id);
-		break;
+		if (/*Collision*/false) {
+			
+		}
+		else {
+			clients[c_id].x = x;
+			clients[c_id].y = y;
+			clients[c_id].send_move_packet(c_id);
+		}
 	}
+	break;
+	case CS_CHAT:
+	{
+
+	}
+	break;
+	case CS_ATTACK:
+	{
+
+	}
+	break;
+	case CS_TELEPORT:
+	{
+
+	}
+	break;
+	case CS_LOGOUT:
+	{
+		// Disconect Client
+	}
+	break;
 	}
 }
 
