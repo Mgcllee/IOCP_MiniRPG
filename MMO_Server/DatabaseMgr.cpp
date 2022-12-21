@@ -3,6 +3,18 @@
 #include "stdafx.h"
 #include "DatabaseMgr.h"
 
+int get_player_number() {
+	// User index 범위 내에서 name이 default값인 empty 로 되어 있는 것 찾기
+	for (int i = 0; i < MAX_USER; ++i) {
+		if (0 == strcmp(clients[i]._name, "empty")) {
+			return i;
+			break;
+		}
+		continue;
+	}
+	return -1;
+}
+
 void show_error(SQLHANDLE hHandle, SQLSMALLINT hType, RETCODE RetCode)
 {
 	SQLSMALLINT iRec = 0;
@@ -22,17 +34,21 @@ void show_error(SQLHANDLE hHandle, SQLSMALLINT hType, RETCODE RetCode)
 	}
 }
 
-bool checking_DB(short p_id, short c_id) {
+bool checking_DB(string p_name, short& c_id) {
 	SQLHENV henv;
 	SQLHDBC hdbc;
 	SQLHSTMT hstmt = 0;
 	SQLRETURN retcode;
-	SQLWCHAR szName[NAME_SIZE];
-	SQLINTEGER user_id, POSITION_X, POSITION_Y;
+	SQLWCHAR Name[NAME_SIZE];
+	SQLINTEGER PosX, PosY, EXP;
 
-	SQLLEN cbName = 0, cb_pos_x = 0, cb_pos_y = 0, cb_id = 0;
+	SQLLEN cbName = 0, cb_pos_x = 0, cb_pos_y = 0, cb_exp = 0;
 
 	setlocale(LC_ALL, "Korean");
+
+	if (-1 == c_id) {
+		c_id = get_player_number();
+	}
 
 	retcode = SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &henv); 
 	if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
@@ -41,32 +57,42 @@ bool checking_DB(short p_id, short c_id) {
 			retcode = SQLAllocHandle(SQL_HANDLE_DBC, henv, &hdbc);
 			if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
 				SQLSetConnectAttr(hdbc, SQL_LOGIN_TIMEOUT, (SQLPOINTER)5, 0);
-				retcode = SQLConnect(hdbc, (SQLWCHAR*)L"2022GAMEODBC", SQL_NTS, (SQLWCHAR*)NULL, 0, NULL, 0);
+				retcode = SQLConnect(hdbc, (SQLWCHAR*)L"GSPDB", SQL_NTS, (SQLWCHAR*)NULL, 0, NULL, 0);
 				if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
 					retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
-					retcode = SQLExecDirect(hstmt, (SQLWCHAR*)L"SELECT user_id, user_name, POSITION_X, POSITION_Y FROM user_table_2018184020", SQL_NTS);
+					retcode = SQLExecDirect(hstmt, (SQLWCHAR*)L"SELECT NAME, PosX, PosY, EXP FROM PlayerInfo", SQL_NTS);
 					if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
 
-						retcode = SQLBindCol(hstmt, 1, SQL_C_LONG, &user_id, 4, &cb_id);
-						retcode = SQLBindCol(hstmt, 2, SQL_C_WCHAR, szName, NAME_SIZE, &cbName);
-						retcode = SQLBindCol(hstmt, 3, SQL_C_LONG, &POSITION_X, 4, &cb_pos_x);
-						retcode = SQLBindCol(hstmt, 4, SQL_C_LONG, &POSITION_Y, 4, &cb_pos_y);
+						retcode = SQLBindCol(hstmt, 1, SQL_C_WCHAR, Name, NAME_SIZE, &cbName);
+						retcode = SQLBindCol(hstmt, 2, SQL_C_LONG, &PosX, 4, &cb_pos_x);
+						retcode = SQLBindCol(hstmt, 3, SQL_C_LONG, &PosY, 4, &cb_pos_y);
+						retcode = SQLBindCol(hstmt, 4, SQL_C_LONG, &EXP, 4, &cb_exp);
 
-						for (int i = 0; ; i++) {
+						for (int i = 0; ; ++i) {
 							retcode = SQLFetch(hstmt);
 							if (retcode == SQL_ERROR || retcode == SQL_SUCCESS_WITH_INFO)
 								show_error(hstmt, SQL_HANDLE_STMT, retcode);
 							if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO)
 							{
-								// input id가 유효할 경우 clinets에 새로운 플레이어의 정보를 넣는다.
-								if (user_id == p_id) {
-									// clients[c_id].game_id = user_id;
-									clients[c_id].x = POSITION_X;
-									clients[c_id].y = POSITION_Y;
-									int strSize = WideCharToMultiByte(CP_ACP, 0, szName, -1, NULL, 0, NULL, NULL);
-									WideCharToMultiByte(CP_ACP, 0, szName, -1, clients[c_id]._name, strSize, 0, 0);
-									return true;
-								}
+								char* buf_name{};
+								int strSize = WideCharToMultiByte(CP_ACP, 0, Name, -1, NULL, 0, NULL, NULL);
+								WideCharToMultiByte(CP_ACP, 0, Name, -1, buf_name, strSize, 0, 0);
+
+								// p_name == szName 인 경우 clinets에 새로운 플레이어의 정보를 넣는다.
+
+								clients[c_id].x = PosX;
+								clients[c_id].y = PosY;
+								// strncpy_s(clients[c_id]._name, buf_name, sizeof(buf_name));
+								return true;
+
+								// 현재문제점!!!
+								//if (0 == strcmp(buf_name, p_name.c_str())) {
+								//	// clients[c_id].game_id = user_id;
+								//	clients[c_id].x = PosX;
+								//	clients[c_id].y = PosY;
+								//	strncpy_s(clients[c_id]._name, buf_name, strlen(buf_name));
+								//	return true;
+								//}
 							}
 							else
 								return false;

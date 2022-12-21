@@ -1,9 +1,25 @@
+#define SFML_STATIC 1
 #include <SFML/Graphics.hpp>
 #include <SFML/Network.hpp>
 #include <iostream>
 #include <Windows.h>
 #include <thread>
 using namespace std;
+
+#ifdef _DEBUG
+#pragma comment (lib, "lib/sfml-graphics-s-d.lib")
+#pragma comment (lib, "lib/sfml-window-s-d.lib")
+#pragma comment (lib, "lib/sfml-system-s-d.lib")
+#pragma comment (lib, "lib/sfml-network-s-d.lib")
+#pragma comment (lib, "lib/freetype.lib")
+#else
+#pragma comment (lib, "lib/sfml-graphics-s.lib")
+#pragma comment (lib, "lib/sfml-window-s.lib")
+#pragma comment (lib, "lib/sfml-system-s.lib")
+#pragma comment (lib, "lib/sfml-network-s.lib")
+#endif
+
+// #pragma comment (lib, "lib/freetype.lib")
 
 #pragma comment (lib, "opengl32.lib")
 #pragma comment (lib, "winmm.lib")
@@ -27,7 +43,20 @@ sf::Texture* board;
 sf::Sprite m_sprite;
 string user_id = "\0";
 
-sf::Sprite player_sprite;
+//int MyId;
+//class PLAYER {
+//public:
+//	sf::Texture* p_texture;
+//	sf::Sprite p_sprite;
+//
+//	int		id = -1;
+//	int		hp = -1;
+//	int		max_hp = -1;
+//	int		exp = -1;
+//	int		level = -1;
+//	short	x, y;
+//};
+//array<PLAYER, MAX_USER + MAX_NPC> players;
 
 sf::TcpSocket g_socket;
 
@@ -62,16 +91,6 @@ void network_module() {
 			break;
 		}
 	}
-
-	cout << "입력받은 ID: " << user_id << endl;
-
-	CS_LOGIN_PACKET p;
-	p.size = sizeof(p);
-	p.type = CS_LOGIN;
-	strcpy_s(p.name, user_id.c_str());
-	send_packet(&p);
-
-	main_page();
 }
 
 void ProcessPacket(char* ptr)
@@ -89,7 +108,6 @@ void ProcessPacket(char* ptr)
 	{
 		SC_MOVE_OBJECT_PACKET* my_packet = reinterpret_cast<SC_MOVE_OBJECT_PACKET*>(ptr);
 		int other_id = my_packet->id;
-		player_sprite.setPosition(my_packet->x * TILE_SIZE, my_packet->y * TILE_SIZE);
 		break;
 	}
 	}
@@ -147,12 +165,6 @@ void main_page() {
 			mapMgr.m_sprite[wid][hei].setPosition(TILE_SIZE * wid, TILE_SIZE * hei);
 		}
 	}
-
-	board = new sf::Texture;
-	board->loadFromFile("texture\\ChracterSprite.png");
-
-	player_sprite.setTexture(*board);
-	player_sprite.setTextureRect(sf::IntRect(0, 0, 42, 42));
 }
 
 void client_main() {
@@ -188,10 +200,10 @@ void DrawMap(sf::RenderWindow& window) {
 				window.draw(mapMgr.m_sprite[wid][hei]);
 			}
 		}
-		window.draw(player_sprite);
 		break;
 	}
 }
+
 
 int main()
 {
@@ -199,8 +211,6 @@ int main()
 
 	sf::RenderWindow window(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "User Name");
 	g_window = &window;
-
-	thread net_module{ network_module };
 
 	while (window.isOpen())
 	{
@@ -210,8 +220,10 @@ int main()
 			switch (event.type)
 			{
 			case sf::Event::Closed:
+			{
 				window.close();
-				break;
+			}
+			break;
 			case sf::Event::KeyPressed:
 			{
 				short direction = -1;
@@ -229,18 +241,28 @@ int main()
 						direction = 2;
 					break;
 				case sf::Keyboard::Left:
-					if(STAGE::HOME == current_stage)
+					if (STAGE::HOME == current_stage)
 						direction = 3;
 					break;
 				case sf::Keyboard::BackSpace:
-					if (!user_id.empty() && (current_stage == STAGE::TITLE)) {
+					if (!user_id.empty() && (current_stage == STAGE::TITLE))
+					{
 						user_id.pop_back();
 						text.setString(user_id);
 					}
 					break;
 				case sf::Keyboard::Return:
-					current_stage = STAGE::HOME;
-					break;
+				if(STAGE::TITLE == current_stage) {
+					CS_LOGIN_PACKET p;
+					p.size = sizeof(p);
+					p.type = CS_LOGIN;
+					strcpy_s(p.name, user_id.c_str());
+					send_packet(&p);
+				}
+				else if (STAGE::HOME == current_stage) {
+					// send chat 
+				}
+				break;
 				case sf::Keyboard::Escape:
 					window.close();
 					break;
@@ -255,22 +277,24 @@ int main()
 			}
 			break;
 			case sf::Event::TextEntered:
-				if (event.text.unicode < 128) {
-					if (user_id.size() < 18 && current_stage == 0
-						&& (isupper(event.text.unicode) || islower(event.text.unicode) || isdigit(event.text.unicode)))
+			{
+				if (event.text.unicode < 128)
+				{
+					if (user_id.size() < 18 && current_stage == 0 && (isupper(event.text.unicode) || islower(event.text.unicode) || isdigit(event.text.unicode)))
 					{
 						user_id.push_back(event.text.unicode);
 						text.setString(user_id);
 					}
 				}
-				break;
 			}
-		}
+			break;
+			}
 
-		window.clear();
-		client_main();
-		DrawMap(window);
-		window.display();
+			window.clear();
+			// client_main();	// Server 연결시에만 사용할 것
+			DrawMap(window);
+			window.display();
+		}
 	}
 
 	return 0;

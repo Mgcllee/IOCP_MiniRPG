@@ -1,23 +1,12 @@
 #pragma once
 #include "stdafx.h"
+#include "DatabaseMgr.h"
 
 HANDLE h_iocp;
 SOCKET g_s_socket, g_c_socket;
 
 array<SESSION, MAX_USER + MAX_NPC> clients;
 OVER_EXP g_a_over;
-
-int get_player_number() {
-	// User index 범위 내에서 name이 default값인 empty 로 되어 있는 것 찾기
-	for (int i = 0; i < MAX_USER; ++i) {
-		if (0 == strcmp(clients[i]._name, "empty")) {
-			return i;
-			break;
-		}
-		continue;
-	}
-	return -1;
-}
 
 void process_packet(int c_id, char* packet) 
 {
@@ -28,15 +17,31 @@ void process_packet(int c_id, char* packet)
 		CS_LOGIN_PACKET* p = reinterpret_cast<CS_LOGIN_PACKET*>(packet);
 		cout << "input Login name: " << p->name << endl;
 		
-		
-		
-		int new_client_id = get_player_number();
-		if (-1 == new_client_id) {
-			// Login Fail
+		short new_client_id = - 1;
+		if (checking_DB(p->name, new_client_id)) {
+			// Success Login
+			cout << "Success Login\n";
+			strncpy_s(clients[new_client_id]._name, p->name, strlen(p->name));
 
+			SC_LOGIN_OK_PACKET ok_p;
+			ok_p.size = sizeof(ok_p);
+			ok_p.type = SC_LOGIN_OK;
+			clients[new_client_id].do_send(&ok_p);
+
+			SC_LOGIN_INFO_PACKET info_p;
+			info_p.size = sizeof(info_p);
+			info_p.type = SC_LOGIN_INFO;
+			info_p.x = clients[new_client_id].x;
+			info_p.y = clients[new_client_id].y;
+			clients[new_client_id].do_send(&info_p);
 		}
 		else {
-			strncpy_s(clients[new_client_id]._name, p->name, strlen(p->name));
+			// Fail Login and try Logout
+			cout << "Fail Loing\n";
+			SC_LOGIN_FAIL_PACKET p;
+			p.size = sizeof(p);
+			p.type = SC_LOGIN_FAIL;
+			clients[new_client_id].do_send(&p);
 		}
 	}
 	break;
@@ -44,6 +49,7 @@ void process_packet(int c_id, char* packet)
 	{
 		CS_MOVE_PACKET* p = reinterpret_cast<CS_MOVE_PACKET*>(packet);
 		
+
 		short x = clients[c_id].x;
 		short y = clients[c_id].y;
 		switch (p->direction)
