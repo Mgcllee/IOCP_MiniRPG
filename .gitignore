@@ -30,22 +30,13 @@
 *.exe
 *.out
 *.app
+*.vs
+include/
 
 #RPG_Client
-RPG_Client/lib/
-RPG_Client/include/
 RPG_Client/x64/
-*.png
-*.bmp
 *.ttf
 
 #Visual vcxproj
-*.vcxproj
-*.filters
 *.user
-.vs/
 x64/
-
-#MMO_Server
-lua54.lib
-include/

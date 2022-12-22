@@ -1,5 +1,5 @@
 #pragma once
-constexpr auto TILE_SIZE = 42.5;
+constexpr float TILE_SIZE = 42.5f;
 
 constexpr int PORT_NUM = 4000;
 constexpr int BUF_SIZE = 200;
