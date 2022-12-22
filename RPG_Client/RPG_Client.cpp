@@ -37,6 +37,9 @@ enum STAGE { TITLE, HOME };
 short current_stage = TITLE;
 
 sf::RenderWindow* g_window;
+
+sf::Clock anim_clock;
+
 sf::Font g_font;
 sf::Text text;
 sf::Texture* board;
@@ -48,6 +51,17 @@ class PLAYER {
 public:
 	sf::Texture* p_texture[4];
 	sf::Sprite p_sprite[4];
+
+	sf::Texture* p_texture_a01;
+	sf::Sprite p_sprite_a01;
+	bool b_attack01 = false;
+	int attack_frame_01 = 20;
+
+	sf::Texture* p_texture_a02;
+	sf::Sprite p_sprite_a02;
+	bool b_attack02 = false;
+	float attack_frame_02 = 0;
+	float attack_frame_02_y = 0;
 
 	short direction = 2;
 
@@ -126,6 +140,16 @@ void ProcessPacket(char* ptr)
 				players[MyId].p_sprite[i].setTextureRect(sf::IntRect(0, 48 * i, 48, 48));
 			}
 
+			players[MyId].p_texture_a01 = new sf::Texture;
+			players[MyId].p_texture_a01->loadFromFile("texture\\attack01.png");
+			players[MyId].p_sprite_a01.setTexture(*players[MyId].p_texture_a01);
+			players[MyId].p_sprite_a01.setTextureRect(sf::IntRect(20, 30, 70, 70));
+
+			players[MyId].p_texture_a02 = new sf::Texture;
+			players[MyId].p_texture_a02->loadFromFile("texture\\attack02.png");
+			players[MyId].p_sprite_a02.setTexture(*players[MyId].p_texture_a02);
+			players[MyId].p_sprite_a02.setTextureRect(sf::IntRect(0, 0, 165, 180));
+
 			players[MyId].p_sprite[players[MyId].direction].setPosition(TILE_SIZE * players[MyId].x, TILE_SIZE * players[MyId].y);
 		}
 	}
@@ -196,6 +220,8 @@ void main_page() {
 			mapMgr.m_sprite[wid][hei].setPosition(TILE_SIZE * wid, TILE_SIZE * hei);
 		}
 	}
+
+	// text.setPosition(800, 480);
 }
 
 void client_main() {
@@ -224,27 +250,65 @@ void DrawMap(sf::RenderWindow& window) {
 	case STAGE::TITLE:
 	{
 		window.draw(m_sprite);
-		window.draw(text);
 	}
 	break;
 	case STAGE::HOME:
 	{
-		text.setPosition(800, 480);
+		// map tile
 		for (int hei = 0; hei < MAX_HEI_TILE; ++hei) {
 			for (int wid = 0; wid < MAX_WID_TILE; ++wid) {
 				window.draw(mapMgr.m_sprite[wid][hei]);
 			}
 		}
+		// players
 		for (PLAYER& pl : players) {
 			if (pl.id != -1) {
+				// player character
 				window.draw(pl.p_sprite[pl.direction]);
+				
+				// player attack 01 animation
+				if (pl.b_attack01) {
+					if (anim_clock.getElapsedTime().asMilliseconds() > 300) {
+						pl.attack_frame_01 += 70;
+						anim_clock.restart();
+						if (pl.attack_frame_01 > 240) {
+							pl.attack_frame_01 = 20;
+							pl.b_attack01 = false;
+						}
+						pl.p_sprite_a01.setTextureRect(sf::IntRect(pl.attack_frame_01, 30, 70, 70));
+					}
+					pl.p_sprite_a01.setPosition(TILE_SIZE* pl.x - 26, TILE_SIZE* pl.y - 34);
+					pl.p_sprite_a01.setScale(2.f, 2.f);
+					window.draw(pl.p_sprite_a01);
+				}
+
+				// player attack 02 animation
+				if (pl.b_attack02) {
+					if (anim_clock.getElapsedTime().asMilliseconds() > 100) {
+						pl.attack_frame_02 += 187.4;
+
+						anim_clock.restart();
+						if (pl.attack_frame_02 > 749.6f && pl.attack_frame_02_y < 1100) {
+							pl.attack_frame_02 = 0;
+							pl.attack_frame_02_y += 184.4;
+						}
+						if (pl.attack_frame_02_y > 1100) {
+							pl.attack_frame_02 = 0;
+							pl.attack_frame_02_y = 0;
+							pl.b_attack02 = false;
+						}
+						pl.p_sprite_a02.setTextureRect(sf::IntRect(pl.attack_frame_02, pl.attack_frame_02_y, 187.4, 184.4));
+					}
+					pl.p_sprite_a02.setPosition(TILE_SIZE * pl.x - 65, TILE_SIZE * pl.y - 47);
+					window.draw(pl.p_sprite_a02);
+				}
 			}
 		}
 	}
 	break;
 	}
+	window.draw(text);
 }
-
 
 int main()
 {
@@ -266,9 +330,24 @@ int main()
 				window.close();
 			}
 			break;
+			case sf::Event::TextEntered:
+			{
+				if (event.text.unicode < 128)
+				{
+					if (user_id.size() < 18 && (isupper(event.text.unicode) || islower(event.text.unicode) || isdigit(event.text.unicode)))
+					{
+						user_id.push_back(event.text.unicode);
+						text.setString(user_id);
+					}
+				}
+			}
+			break;
 			case sf::Event::KeyPressed:
 			{
 				switch (event.key.code) {
+				case sf::Keyboard::Escape:
+					window.close();
+					break;
 				case sf::Keyboard::Down: 
 				{
 					if (STAGE::HOME == current_stage) {
@@ -314,54 +393,61 @@ int main()
 				}
 				break;
 				case sf::Keyboard::BackSpace:
+				{
 					if (!user_id.empty())
 					{
 						user_id.pop_back();
 						text.setString(user_id);
 					}
-					break;
-				case sf::Keyboard::Return:
-				if(STAGE::TITLE == current_stage) {
-					CS_LOGIN_PACKET p;
-					p.size = sizeof(p);
-					p.type = CS_LOGIN;
-					strcpy_s(p.name, user_id.c_str());
-					send_packet(&p);
-				}
-				else if (STAGE::HOME == current_stage) {
-					// send chat
-					CS_CHAT_PACKET p;
-					p.size = sizeof(p);
-					p.type = CS_CHAT;
-					strcpy_s(p.mess, user_id.c_str());
-					send_packet(&p);
 				}
 				break;
-				case sf::Keyboard::Escape:
-					window.close();
-					break;
-				}
-			}
-			break;
-			case sf::Event::TextEntered:
-			{
-				if (event.text.unicode < 128)
+				case sf::Keyboard::Return:
 				{
-					if (user_id.size() < 18 && current_stage == 0 && (isupper(event.text.unicode) || islower(event.text.unicode) || isdigit(event.text.unicode)))
-					{
-						user_id.push_back(event.text.unicode);
-						text.setString(user_id);
+					if (STAGE::TITLE == current_stage) {
+						CS_LOGIN_PACKET p;
+						p.size = sizeof(p);
+						p.type = CS_LOGIN;
+						strcpy_s(p.name, user_id.c_str());
+						send_packet(&p);
+					}
+					else if (STAGE::HOME == current_stage) {
+						// send chat
+						CS_CHAT_PACKET p;
+						p.size = sizeof(p);
+						p.type = CS_CHAT;
+						strcpy_s(p.mess, user_id.c_str());
+						send_packet(&p);
 					}
 				}
+				break;
+				case sf::Keyboard::Num1:
+				{
+					// attack Skill 01
+					if (current_stage == STAGE::HOME && false == players[MyId].b_attack01 && false == players[MyId].b_attack02) {
+						anim_clock.restart();
+						players[MyId].b_attack01 = true;
+					}
+				}
+				break;
+				case sf::Keyboard::Num2:
+				{
+					// attack 02
+					if (current_stage == STAGE::HOME && false == players[MyId].b_attack01 && false == players[MyId].b_attack02) {
+						anim_clock.restart();
+						players[MyId].b_attack02 = true;
+					}
+				}
+				break;
+				}
 			}
 			break;
 			}
-			
-			window.clear();
-			client_main();	// Server 연결시에만 사용할 것
-			DrawMap(window);
-			window.display();
 		}
+
+		window.clear();
+		client_main();	// Server 연결시에만 사용할 것
+		DrawMap(window);
+		window.display();
 	}
 
 	return 0;
