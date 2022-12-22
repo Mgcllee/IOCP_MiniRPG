@@ -25,7 +25,7 @@ extern "C"
 using namespace std;
 
 enum TYPE		{ ACCEPT, RECV, SEND };
-enum DIRECTION	{ UP, RIGHT, DOWN, LEFT };
+enum DIRECTION	{ DOWN, LEFT, RIGHT, UP };
 
 class OVER_EXP {
 public:

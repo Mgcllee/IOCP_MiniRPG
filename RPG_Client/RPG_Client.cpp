@@ -3,6 +3,7 @@
 #include <SFML/Network.hpp>
 #include <iostream>
 #include <Windows.h>
+#include <array>
 #include <thread>
 using namespace std;
 
@@ -27,7 +28,6 @@ using namespace std;
 
 #include "../MMO_Server/protocol_2022.h"
 
-constexpr auto TILE_SIZE		= 42.5;
 constexpr auto MAX_WID_TILE		= 50;
 constexpr auto MAX_HEI_TILE		= 50;
 constexpr auto WINDOW_WIDTH		= 1000;
@@ -43,20 +43,22 @@ sf::Texture* board;
 sf::Sprite m_sprite;
 string user_id = "\0";
 
-//int MyId;
-//class PLAYER {
-//public:
-//	sf::Texture* p_texture;
-//	sf::Sprite p_sprite;
-//
-//	int		id = -1;
-//	int		hp = -1;
-//	int		max_hp = -1;
-//	int		exp = -1;
-//	int		level = -1;
-//	short	x, y;
-//};
-//array<PLAYER, MAX_USER + MAX_NPC> players;
+int MyId = -1;
+class PLAYER {
+public:
+	sf::Texture* p_texture[4];
+	sf::Sprite p_sprite[4];
+
+	short direction = 2;
+
+	int		id		= -1;
+	int		hp		= -1;
+	int		max_hp	= -1;
+	int		exp		= -1;
+	int		level	= -1;
+	short	x, y;
+};
+array<PLAYER, MAX_USER + MAX_NPC> players;
 
 sf::TcpSocket g_socket;
 
@@ -85,12 +87,6 @@ void network_module() {
 		cout << "서버와 연결할 수 없습니다.\n";
 		g_window->close();
 	}
-
-	while (true) {
-		if (!user_id.empty() && (STAGE::HOME == current_stage)) {
-			break;
-		}
-	}
 }
 
 void ProcessPacket(char* ptr)
@@ -98,18 +94,51 @@ void ProcessPacket(char* ptr)
 	static bool first_time = true;
 	switch (ptr[1])
 	{
+	case SC_LOGIN_FAIL:
+	{
+
+	}
+	break;
+	case SC_LOGIN_OK:
+	{
+		main_page();
+		cout << "Login OK\n";
+	}
+	break;
 	case SC_LOGIN_INFO:
 	{
-		SC_LOGIN_INFO_PACKET* packet = reinterpret_cast<SC_LOGIN_INFO_PACKET*>(ptr);
+		SC_LOGIN_INFO_PACKET* p = reinterpret_cast<SC_LOGIN_INFO_PACKET*>(ptr);
+		MyId = int(p->id);
 
-		break;
+		if (MyId != -1) {
+			players[MyId].id		= MyId;
+			players[MyId].hp		= static_cast<int>(p->hp);
+			players[MyId].max_hp	= static_cast<int>(p->max_hp);
+			players[MyId].exp		= static_cast<int>(p->exp);
+			players[MyId].level		= static_cast<int>(p->level);
+			players[MyId].x			= static_cast<short>(p->x);
+			players[MyId].y			= static_cast<short>(p->y);
+
+			for (int i = 0; i < 4; ++i) {
+				players[MyId].p_texture[i] = new sf::Texture;
+				players[MyId].p_texture[i]->loadFromFile("texture\\ChracterSprite.png");
+				players[MyId].p_sprite[i].setTexture(*players[MyId].p_texture[i]);
+				players[MyId].p_sprite[i].setTextureRect(sf::IntRect(0, 48 * i, 48, 48));
+			}
+
+			players[MyId].p_sprite[players[MyId].direction].setPosition(TILE_SIZE * players[MyId].x, TILE_SIZE * players[MyId].y);
+		}
 	}
+	break;
 	case SC_MOVE_OBJECT:
 	{
-		SC_MOVE_OBJECT_PACKET* my_packet = reinterpret_cast<SC_MOVE_OBJECT_PACKET*>(ptr);
-		int other_id = my_packet->id;
-		break;
+		SC_MOVE_OBJECT_PACKET* p = reinterpret_cast<SC_MOVE_OBJECT_PACKET*>(ptr);
+		int other_id = p->id;
+		players[other_id].x = p->x;
+		players[other_id].y = p->y;
+		players[other_id].p_sprite[players[other_id].direction].setPosition(TILE_SIZE * players[other_id].x, TILE_SIZE * players[other_id].y);
 	}
+	break;
 	}
 }
 
@@ -156,6 +185,8 @@ void login_page()
 }
 
 void main_page() {
+	current_stage = STAGE::HOME;
+
 	board->loadFromFile("texture\\tileSprite.png");
 
 	for (int hei = 0; hei < MAX_HEI_TILE; ++hei) {
@@ -191,22 +222,33 @@ void DrawMap(sf::RenderWindow& window) {
 	switch (current_stage)
 	{
 	case STAGE::TITLE:
+	{
 		window.draw(m_sprite);
 		window.draw(text);
-		break;
+	}
+	break;
 	case STAGE::HOME:
+	{
+		text.setPosition(800, 480);
 		for (int hei = 0; hei < MAX_HEI_TILE; ++hei) {
 			for (int wid = 0; wid < MAX_WID_TILE; ++wid) {
 				window.draw(mapMgr.m_sprite[wid][hei]);
 			}
 		}
-		break;
+		for (PLAYER& pl : players) {
+			if (pl.id != -1) {
+				window.draw(pl.p_sprite[pl.direction]);
+			}
+		}
+	}
+	break;
 	}
 }
 
 
 int main()
 {
+	network_module();
 	login_page();
 
 	sf::RenderWindow window(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "User Name");
@@ -226,26 +268,53 @@ int main()
 			break;
 			case sf::Event::KeyPressed:
 			{
-				short direction = -1;
 				switch (event.key.code) {
-				case sf::Keyboard::Up:
-					if (STAGE::HOME == current_stage)
-						direction = 0;
-					break;
-				case sf::Keyboard::Right:
-					if (STAGE::HOME == current_stage)
-						direction = 1;
-					break;
-				case sf::Keyboard::Down:
-					if (STAGE::HOME == current_stage)
-						direction = 2;
-					break;
+				case sf::Keyboard::Down: 
+				{
+					if (STAGE::HOME == current_stage) {
+						CS_MOVE_PACKET p;
+						p.size = sizeof(p);
+						p.type = CS_MOVE;
+						p.direction = players[MyId].direction = 0;
+						send_packet(&p);
+					}
+				}
+				break;
 				case sf::Keyboard::Left:
-					if (STAGE::HOME == current_stage)
-						direction = 3;
-					break;
+				{
+					if (STAGE::HOME == current_stage) {
+						CS_MOVE_PACKET p;
+						p.size = sizeof(p);
+						p.type = CS_MOVE;
+						p.direction = players[MyId].direction = 1;
+						send_packet(&p);
+					}
+				}
+				break;
+				case sf::Keyboard::Right:
+				{
+					if (STAGE::HOME == current_stage) {
+						CS_MOVE_PACKET p;
+						p.size = sizeof(p);
+						p.type = CS_MOVE;
+						p.direction = players[MyId].direction = 2;
+						send_packet(&p);
+					}
+				}
+				break;
+				case sf::Keyboard::Up:
+				{
+					if (STAGE::HOME == current_stage) {
+						CS_MOVE_PACKET p;
+						p.size = sizeof(p);
+						p.type = CS_MOVE;
+						p.direction = players[MyId].direction = 3;
+						send_packet(&p);
+					}
+				}
+				break;
 				case sf::Keyboard::BackSpace:
-					if (!user_id.empty() && (current_stage == STAGE::TITLE))
+					if (!user_id.empty())
 					{
 						user_id.pop_back();
 						text.setString(user_id);
@@ -260,19 +329,17 @@ int main()
 					send_packet(&p);
 				}
 				else if (STAGE::HOME == current_stage) {
-					// send chat 
+					// send chat
+					CS_CHAT_PACKET p;
+					p.size = sizeof(p);
+					p.type = CS_CHAT;
+					strcpy_s(p.mess, user_id.c_str());
+					send_packet(&p);
 				}
 				break;
 				case sf::Keyboard::Escape:
 					window.close();
 					break;
-				}
-				if (-1 != direction) {
-					CS_MOVE_PACKET p;
-					p.size = sizeof(p);
-					p.type = CS_MOVE;
-					p.direction = direction;
-					send_packet(&p);
 				}
 			}
 			break;
@@ -289,9 +356,9 @@ int main()
 			}
 			break;
 			}
-
+			
 			window.clear();
-			// client_main();	// Server 연결시에만 사용할 것
+			client_main();	// Server 연결시에만 사용할 것
 			DrawMap(window);
 			window.display();
 		}

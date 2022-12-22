@@ -31,8 +31,10 @@ void process_packet(int c_id, char* packet)
 			SC_LOGIN_INFO_PACKET info_p;
 			info_p.size = sizeof(info_p);
 			info_p.type = SC_LOGIN_INFO;
+			info_p.id = new_client_id;
 			info_p.x = clients[new_client_id].x;
 			info_p.y = clients[new_client_id].y;
+
 			clients[new_client_id].do_send(&info_p);
 		}
 		else {
@@ -49,25 +51,28 @@ void process_packet(int c_id, char* packet)
 	{
 		CS_MOVE_PACKET* p = reinterpret_cast<CS_MOVE_PACKET*>(packet);
 		
-
 		short x = clients[c_id].x;
 		short y = clients[c_id].y;
 		switch (p->direction)
 		{
 		case DIRECTION::UP:		--y;	break;
+		case DIRECTION::LEFT:	--x;	break;
 		case DIRECTION::RIGHT:	++x;	break;
 		case DIRECTION::DOWN:	++y;	break;
-		case DIRECTION::LEFT:	--x;	break;
 		}
 
-		if (/*Collision*/false) {
-			
-		}
-		else {
-			clients[c_id].x = x;
-			clients[c_id].y = y;
-			clients[c_id].send_move_packet(c_id);
-		}
+		clients[c_id].x = x;
+		clients[c_id].y = y;
+		clients[c_id].send_move_packet(c_id);
+
+		//if (/*Collision*/false) {
+		//	
+		//}
+		//else {
+		//	clients[c_id].x = x;
+		//	clients[c_id].y = y;
+		//	clients[c_id].send_move_packet(c_id);
+		//}
 	}
 	break;
 	case CS_CHAT:
