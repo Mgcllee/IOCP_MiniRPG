@@ -51,6 +51,7 @@ public:
 		memcpy(_send_buf, packet, packet[0]);
 	}
 };
+
 class SESSION {
 	OVER_EXP _recv_over;
 

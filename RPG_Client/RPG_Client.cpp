@@ -21,8 +21,6 @@ using namespace std;
 #pragma comment (lib, "lib/sfml-network-s.lib")
 #endif
 
-// #pragma comment (lib, "lib/freetype.lib")
-
 #pragma comment (lib, "opengl32.lib")
 #pragma comment (lib, "winmm.lib")
 #pragma comment (lib, "ws2_32.lib")
@@ -70,6 +68,8 @@ public:
 	sf::RectangleShape s_cur_hp;
 	sf::RectangleShape s_max_exp;
 	sf::RectangleShape s_cur_exp;
+
+	sf::Text cur_level;
 
 	short direction = 2;
 
@@ -138,10 +138,10 @@ void ProcessPacket(char* ptr)
 		if (MyId == -1 && new_id >= 0) {
 			MyId = new_id;
 			players[MyId].id		= MyId;
-			players[MyId].hp		= static_cast<int>(p->hp);
-			players[MyId].max_hp	= static_cast<int>(p->max_hp);
+			players[MyId].hp		= 190;
+			players[MyId].max_hp	= 200;
 			players[MyId].exp		= static_cast<int>(p->exp);
-			players[MyId].level		= (int)(players[MyId].exp / 60);
+			players[MyId].level		= (int)(players[MyId].exp / 60) + 1;
 			players[MyId].x			= static_cast<short>(p->x);
 			players[MyId].y			= static_cast<short>(p->y);
 			strcpy_s(players[MyId].name, p->name);
@@ -171,6 +171,24 @@ void ProcessPacket(char* ptr)
 			players[MyId].s_cur_exp = sf::RectangleShape(sf::Vector2f((float)(players[MyId].exp % 60) * 10.f, 10.f));
 			players[MyId].s_cur_exp.setFillColor(sf::Color::Yellow);
 			players[MyId].s_cur_exp.setPosition(sf::Vector2f(0.f, 685.f));
+
+			players[MyId].s_max_hp = sf::RectangleShape(sf::Vector2f(200.f, 20.f));
+			players[MyId].s_max_hp.setFillColor(sf::Color::White);
+			players[MyId].s_max_hp.setPosition(sf::Vector2f(0.f, 660.f));
+
+			players[MyId].s_cur_hp = sf::RectangleShape(sf::Vector2f(players[MyId].hp, 20.f));
+			players[MyId].s_cur_hp.setFillColor(sf::Color::Red);
+			players[MyId].s_cur_hp.setPosition(sf::Vector2f(0.f, 660.f));
+
+			string view_level = "0";
+			view_level[0] += players[MyId].level;
+			players[MyId].cur_level.setFont(g_font);
+			players[MyId].cur_level.setCharacterSize(40);
+			players[MyId].cur_level.setPosition(10, 10);
+			players[MyId].cur_level.setFillColor(sf::Color::White);
+			players[MyId].cur_level.setOutlineColor(sf::Color::Black);
+			players[MyId].cur_level.setOutlineThickness(2.f);
+			players[MyId].cur_level.setString(string("Level: ").append(view_level));
 		}
 		else {
 			if (new_id != MyId && new_id >= 0) {
@@ -195,7 +213,7 @@ void ProcessPacket(char* ptr)
 				players[new_id].p_texture_a01->loadFromFile("texture\\attack01.png");
 				players[new_id].p_sprite_a01.setTexture(*players[new_id].p_texture_a01);
 				players[new_id].p_sprite_a01.setTextureRect(sf::IntRect(20, 30, 70, 70));
-						
+				
 				players[new_id].p_texture_a02 = new sf::Texture;
 				players[new_id].p_texture_a02->loadFromFile("texture\\attack02.png");
 				players[new_id].p_sprite_a02.setTexture(*players[new_id].p_texture_a02);
@@ -416,6 +434,9 @@ void DrawMap(sf::RenderWindow& window) {
 
 		window.draw(players[MyId].s_max_exp);
 		window.draw(players[MyId].s_cur_exp);
+		window.draw(players[MyId].s_max_hp);
+		window.draw(players[MyId].s_cur_hp);
+		window.draw(players[MyId].cur_level);
 	}
 	break;
 	}
