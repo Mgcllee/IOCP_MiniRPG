@@ -60,6 +60,8 @@ public:
 	short	x, y;
 	char	_name[NAME_SIZE];
 	int		_prev_remain;
+	char	direction;
+	int		exp;
 
 	SESSION() {
 		_socket = 0;

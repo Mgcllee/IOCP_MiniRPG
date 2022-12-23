@@ -4,6 +4,7 @@
 #include <iostream>
 #include <Windows.h>
 #include <array>
+#include <vector>
 #include <thread>
 using namespace std;
 
@@ -46,6 +47,8 @@ sf::Texture* board;
 sf::Sprite m_sprite;
 string user_id = "\0";
 
+vector<sf::Text> chat_log;
+
 int MyId = -1;
 class PLAYER {
 public:
@@ -63,8 +66,14 @@ public:
 	float attack_frame_02 = 0;
 	float attack_frame_02_y = 0;
 
+	sf::RectangleShape s_max_hp;
+	sf::RectangleShape s_cur_hp;
+	sf::RectangleShape s_max_exp;
+	sf::RectangleShape s_cur_exp;
+
 	short direction = 2;
 
+	char	name[NAME_SIZE];
 	int		id		= -1;
 	int		hp		= -1;
 	int		max_hp	= -1;
@@ -110,7 +119,9 @@ void ProcessPacket(char* ptr)
 	{
 	case SC_LOGIN_FAIL:
 	{
-
+		user_id.clear();
+		text.setString(user_id);
+		cout << "Fail Login\n";
 	}
 	break;
 	case SC_LOGIN_OK:
@@ -122,16 +133,18 @@ void ProcessPacket(char* ptr)
 	case SC_LOGIN_INFO:
 	{
 		SC_LOGIN_INFO_PACKET* p = reinterpret_cast<SC_LOGIN_INFO_PACKET*>(ptr);
-		MyId = int(p->id);
+		int new_id = int(p->id);
 
-		if (MyId != -1) {
+		if (MyId == -1 && new_id >= 0) {
+			MyId = new_id;
 			players[MyId].id		= MyId;
 			players[MyId].hp		= static_cast<int>(p->hp);
 			players[MyId].max_hp	= static_cast<int>(p->max_hp);
 			players[MyId].exp		= static_cast<int>(p->exp);
-			players[MyId].level		= static_cast<int>(p->level);
+			players[MyId].level		= (int)(players[MyId].exp / 60);
 			players[MyId].x			= static_cast<short>(p->x);
 			players[MyId].y			= static_cast<short>(p->y);
+			strcpy_s(players[MyId].name, p->name);
 
 			for (int i = 0; i < 4; ++i) {
 				players[MyId].p_texture[i] = new sf::Texture;
@@ -139,6 +152,7 @@ void ProcessPacket(char* ptr)
 				players[MyId].p_sprite[i].setTexture(*players[MyId].p_texture[i]);
 				players[MyId].p_sprite[i].setTextureRect(sf::IntRect(0, 48 * i, 48, 48));
 			}
+			players[MyId].p_sprite[players[MyId].direction].setPosition(TILE_SIZE* players[MyId].x, TILE_SIZE* players[MyId].y);
 
 			players[MyId].p_texture_a01 = new sf::Texture;
 			players[MyId].p_texture_a01->loadFromFile("texture\\attack01.png");
@@ -150,7 +164,43 @@ void ProcessPacket(char* ptr)
 			players[MyId].p_sprite_a02.setTexture(*players[MyId].p_texture_a02);
 			players[MyId].p_sprite_a02.setTextureRect(sf::IntRect(0, 0, 165, 180));
 
-			players[MyId].p_sprite[players[MyId].direction].setPosition(TILE_SIZE * players[MyId].x, TILE_SIZE * players[MyId].y);
+			players[MyId].s_max_exp = sf::RectangleShape(sf::Vector2f(600.f, 10.f));
+			players[MyId].s_max_exp.setFillColor(sf::Color::White);
+			players[MyId].s_max_exp.setPosition(sf::Vector2f(0.f, 685.f));
+						  
+			players[MyId].s_cur_exp = sf::RectangleShape(sf::Vector2f((float)(players[MyId].exp % 60) * 10.f, 10.f));
+			players[MyId].s_cur_exp.setFillColor(sf::Color::Yellow);
+			players[MyId].s_cur_exp.setPosition(sf::Vector2f(0.f, 685.f));
+		}
+		else {
+			if (new_id != MyId && new_id >= 0) {
+				players[new_id].id = MyId;
+				players[new_id].hp = static_cast<int>(p->hp);
+				players[new_id].max_hp = static_cast<int>(p->max_hp);
+				players[new_id].exp = static_cast<int>(p->exp);
+				players[new_id].level = static_cast<int>(p->level);
+				players[new_id].x = static_cast<short>(p->x);
+				players[new_id].y = static_cast<short>(p->y);
+				strcpy_s(players[new_id].name, p->name);
+
+				for (int i = 0; i < 4; ++i) {
+					players[new_id].p_texture[i] = new sf::Texture;
+					players[new_id].p_texture[i]->loadFromFile("texture\\ChracterSprite.png");
+					players[new_id].p_sprite[i].setTexture(*players[MyId].p_texture[i]);
+					players[new_id].p_sprite[i].setTextureRect(sf::IntRect(290, 193 + 48 * i, 48, 48));
+				}
+				players[new_id].p_sprite[players[new_id].direction].setPosition(TILE_SIZE * players[new_id].x, TILE_SIZE * players[new_id].y);
+
+				players[new_id].p_texture_a01 = new sf::Texture;
+				players[new_id].p_texture_a01->loadFromFile("texture\\attack01.png");
+				players[new_id].p_sprite_a01.setTexture(*players[new_id].p_texture_a01);
+				players[new_id].p_sprite_a01.setTextureRect(sf::IntRect(20, 30, 70, 70));
+						
+				players[new_id].p_texture_a02 = new sf::Texture;
+				players[new_id].p_texture_a02->loadFromFile("texture\\attack02.png");
+				players[new_id].p_sprite_a02.setTexture(*players[new_id].p_texture_a02);
+				players[new_id].p_sprite_a02.setTextureRect(sf::IntRect(0, 0, 165, 180));
+			}
 		}
 	}
 	break;
@@ -160,7 +210,49 @@ void ProcessPacket(char* ptr)
 		int other_id = p->id;
 		players[other_id].x = p->x;
 		players[other_id].y = p->y;
+		players[other_id].direction = p->direction;
 		players[other_id].p_sprite[players[other_id].direction].setPosition(TILE_SIZE * players[other_id].x, TILE_SIZE * players[other_id].y);
+	}
+	break;
+	case SC_CHAT:
+	{
+		sf::Text t_buf;
+		SC_CHAT_PACKET* p = reinterpret_cast<SC_CHAT_PACKET*>(ptr);
+		
+		t_buf.setFont(g_font);
+		t_buf.setCharacterSize(20);
+		t_buf.setFillColor(sf::Color::White);
+		t_buf.setString(players[p->id].name + string(": ") + p->mess);
+		chat_log.push_back(t_buf);
+	}
+	break;
+	case SC_ADD_OBJECT:
+	{
+		/*SC_ADD_OBJECT_PACKET* p = reinterpret_cast<SC_ADD_OBJECT_PACKET*>(ptr);
+		int new_id = p->id;
+
+		if (new_id != -1) {
+			players[new_id].id = new_id;
+			players[new_id].hp = static_cast<int>(p->hp);
+			players[new_id].max_hp = static_cast<int>(p->max_hp);
+			players[new_id].exp = static_cast<int>(p->exp);
+			players[new_id].level = static_cast<int>(p->level);
+			players[new_id].x = static_cast<short>(p->x);
+			players[new_id].y = static_cast<short>(p->y);
+		}
+		players[new_id].
+
+		if (new_id == g_myid) {
+			avatar.move(p->x, p->y);
+			g_left_x = p->x - 7;
+			g_top_y = p->y - 7;
+		}
+		else if (new_id < MAX_USER) {
+			players[new_id].show();
+			players[new_id].move(p->x, p->y);
+			players[new_id].game_id = p->game_id;
+		}
+		break;*/
 	}
 	break;
 	}
@@ -221,7 +313,11 @@ void main_page() {
 		}
 	}
 
-	// text.setPosition(800, 480);
+	user_id.clear();
+	text.setFillColor(sf::Color::White);
+	text.setCharacterSize(20);
+	text.setPosition(720, 650);
+	text.setString(user_id);
 }
 
 void client_main() {
@@ -304,6 +400,22 @@ void DrawMap(sf::RenderWindow& window) {
 				}
 			}
 		}
+
+		if (!chat_log.empty()) {
+			reverse(chat_log.begin(), chat_log.end());
+			int pos_y = 640;
+			for (sf::Text& t : chat_log) {
+				pos_y -= 15;
+				if (pos_y < 490)
+					break;
+				t.setPosition(700, pos_y);
+				window.draw(t);
+			}
+			reverse(chat_log.begin(), chat_log.end());
+		}
+
+		window.draw(players[MyId].s_max_exp);
+		window.draw(players[MyId].s_cur_exp);
 	}
 	break;
 	}
@@ -401,6 +513,11 @@ int main()
 					}
 				}
 				break;
+				case sf::Keyboard::Space:
+				{
+					user_id.push_back(' ');
+				}
+				break;
 				case sf::Keyboard::Return:
 				{
 					if (STAGE::TITLE == current_stage) {
@@ -417,6 +534,10 @@ int main()
 						p.type = CS_CHAT;
 						strcpy_s(p.mess, user_id.c_str());
 						send_packet(&p);
+
+						// 채팅창 지우기
+						user_id.clear();
+						text.setString(user_id);
 					}
 				}
 				break;
@@ -426,6 +547,11 @@ int main()
 					if (current_stage == STAGE::HOME && false == players[MyId].b_attack01 && false == players[MyId].b_attack02) {
 						anim_clock.restart();
 						players[MyId].b_attack01 = true;
+
+						CS_TELEPORT_PACKET p;
+						p.size = sizeof(p);
+						p.type = CS_ATTACK;
+						send_packet(&p);
 					}
 				}
 				break;

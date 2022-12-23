@@ -34,16 +34,14 @@ void show_error(SQLHANDLE hHandle, SQLSMALLINT hType, RETCODE RetCode)
 	}
 }
 
-bool checking_DB(string p_name, short& c_id) {
+bool checking_DB(char* p_name, short& c_id) {
 	SQLHENV henv;
 	SQLHDBC hdbc;
 	SQLHSTMT hstmt = 0;
 	SQLRETURN retcode;
 	SQLWCHAR Name[NAME_SIZE];
 	SQLINTEGER PosX, PosY, EXP;
-
 	SQLLEN cbName = 0, cb_pos_x = 0, cb_pos_y = 0, cb_exp = 0;
-
 	setlocale(LC_ALL, "Korean");
 
 	if (-1 == c_id) {
@@ -74,25 +72,20 @@ bool checking_DB(string p_name, short& c_id) {
 								show_error(hstmt, SQL_HANDLE_STMT, retcode);
 							if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO)
 							{
-								char* buf_name{};
+								char db_buf[NAME_SIZE];
 								int strSize = WideCharToMultiByte(CP_ACP, 0, Name, -1, NULL, 0, NULL, NULL);
-								WideCharToMultiByte(CP_ACP, 0, Name, -1, buf_name, strSize, 0, 0);
+								WideCharToMultiByte(CP_ACP, 0, Name, -1, db_buf, strSize, 0, 0);
+								
+								string c_buf = db_buf;
+								c_buf.erase(remove(c_buf.begin(), c_buf.end(), ' '), c_buf.end());
 
-								// p_name == szName 인 경우 clinets에 새로운 플레이어의 정보를 넣는다.
-
-								clients[c_id].x = PosX;
-								clients[c_id].y = PosY;
-								// strncpy_s(clients[c_id]._name, buf_name, sizeof(buf_name));
-								return true;
-
-								// 현재문제점!!!
-								//if (0 == strcmp(buf_name, p_name.c_str())) {
-								//	// clients[c_id].game_id = user_id;
-								//	clients[c_id].x = PosX;
-								//	clients[c_id].y = PosY;
-								//	strncpy_s(clients[c_id]._name, buf_name, strlen(buf_name));
-								//	return true;
-								//}
+								if (strncmp(c_buf.c_str(), p_name, c_buf.length()) == 0) {
+									clients[c_id].x = PosX;
+									clients[c_id].y = PosY;
+									strncpy_s(clients[c_id]._name, c_buf.c_str(), c_buf.length());
+									clients[c_id].exp = EXP;
+									return true;
+								}
 							}
 							else
 								return false;

@@ -16,7 +16,7 @@ void process_packet(int c_id, char* packet)
 	{
 		CS_LOGIN_PACKET* p = reinterpret_cast<CS_LOGIN_PACKET*>(packet);
 		cout << "input Login name: " << p->name << endl;
-		
+
 		short new_client_id = - 1;
 		if (checking_DB(p->name, new_client_id)) {
 			// Success Login
@@ -34,8 +34,26 @@ void process_packet(int c_id, char* packet)
 			info_p.id = new_client_id;
 			info_p.x = clients[new_client_id].x;
 			info_p.y = clients[new_client_id].y;
+			strcpy_s(info_p.name, clients[new_client_id]._name);
+			info_p.exp = clients[new_client_id].exp;
+			info_p.max_hp = 600;
+			info_p.hp = 600;
 
-			clients[new_client_id].do_send(&info_p);
+			// 기존 클라와 신참 클라(본인)에게 신참 클라 정보 알려주기
+			for (int i = 0; i <= new_client_id; ++i) {
+				clients[i].do_send(&info_p);
+			}
+
+			SC_LOGIN_INFO_PACKET old_client;
+			old_client.size = sizeof(old_client);
+			old_client.type = SC_LOGIN_INFO;
+			for (int i = 0; i < new_client_id; ++i) {
+				old_client.id = i;
+				old_client.x = clients[i].x;
+				old_client.y = clients[i].y;
+				strcpy_s(old_client.name, clients[i]._name);
+				clients[new_client_id].do_send(&old_client);
+			}
 		}
 		else {
 			// Fail Login and try Logout
@@ -58,31 +76,55 @@ void process_packet(int c_id, char* packet)
 		case DIRECTION::UP:		--y;	break;
 		case DIRECTION::LEFT:	--x;	break;
 		case DIRECTION::RIGHT:	++x;	break;
-		case DIRECTION::DOWN:	++y;	break;
+		case DIRECTION::DOWN:	++y; 	break;
 		}
 
-		clients[c_id].x = x;
-		clients[c_id].y = y;
-		clients[c_id].send_move_packet(c_id);
+		if (/*Collision*/false) {
+			
+		}
+		else {
+			clients[c_id].x = x;
+			clients[c_id].y = y;
+			clients[c_id].direction = p->direction;
 
-		//if (/*Collision*/false) {
-		//	
-		//}
-		//else {
-		//	clients[c_id].x = x;
-		//	clients[c_id].y = y;
-		//	clients[c_id].send_move_packet(c_id);
-		//}
+			for (SESSION& cl : clients) {
+				if(strcmp(cl._name, "empty") != 0)
+					cl.send_move_packet(c_id);
+			}
+		}
 	}
 	break;
 	case CS_CHAT:
 	{
+		CS_CHAT_PACKET* p = reinterpret_cast<CS_CHAT_PACKET*>(packet);
+		cout << p->mess << endl;
 
+		SC_CHAT_PACKET sc_chat_packet;
+		sc_chat_packet.size = sizeof(sc_chat_packet);
+		sc_chat_packet.type = SC_CHAT;
+		sc_chat_packet.id = c_id;
+		strncpy_s(sc_chat_packet.mess, p->mess, sizeof(p->mess));
+		for (SESSION& cl : clients) {
+			if(0 != strcmp(cl._name, "empty"))
+				cl.do_send(&sc_chat_packet);
+		}
 	}
 	break;
 	case CS_ATTACK:
 	{
-
+		for (SESSION& cl : clients) {
+			if (((cl.x == clients[c_id].x) && (cl.y == clients[c_id].y))
+				|| ((cl.x - 1== clients[c_id].x) && (cl.y == clients[c_id].y))
+				|| ((cl.x + 1== clients[c_id].x) && (cl.y == clients[c_id].y))
+				|| ((cl.x == clients[c_id].x) && (cl.y - 1 == clients[c_id].y))
+				|| ((cl.x == clients[c_id].x) && (cl.y + 1== clients[c_id].y))
+				|| ((cl.x + 1== clients[c_id].x) && (cl.y + 1== clients[c_id].y))
+				|| ((cl.x + 1== clients[c_id].x) && (cl.y - 1== clients[c_id].y))
+				|| ((cl.x - 1== clients[c_id].x) && (cl.y + 1== clients[c_id].y))
+				|| ((cl.x - 1== clients[c_id].x) && (cl.y - 1== clients[c_id].y))) {
+				// die
+			}
+		}
 	}
 	break;
 	case CS_TELEPORT:
@@ -109,20 +151,15 @@ void worker_thread(HANDLE h_iocp) {
 		// error 검출기
 		if (FALSE == ret) {
 			if (ex_over->c_type == ACCEPT) cout << "Accept Error";
-			else {
-				cout << "GQCS Error on client[" << key << "]\n";
-				continue;
-			}
+			else continue;
 		}
-		if ((0 == num_bytes) && (ex_over->c_type == RECV)) {
-			continue;
-		}
+		if ((0 == num_bytes) && (ex_over->c_type == RECV)) continue;
 
 		switch (ex_over->c_type)
 		{
 		case ACCEPT:
 		{
-			int new_c_id = 0;
+			int new_c_id = get_player_number();
 			if (new_c_id != -1) {
 				clients[new_c_id].x = 0;
 				clients[new_c_id].y = 0;

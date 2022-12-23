@@ -39,7 +39,7 @@ struct CS_LOGIN_PACKET {
 struct CS_MOVE_PACKET {
 	unsigned char size;
 	char	type;
-	char	direction;  // 0 : UP, 1 : DOWN, 2 : LEFT, 3 : RIGHT
+	char	direction; 
 	unsigned	move_time;
 };
 
@@ -68,6 +68,7 @@ struct SC_LOGIN_INFO_PACKET {
 	int		exp;
 	int		level;
 	short	x, y;
+	char	name[NAME_SIZE];
 };
 
 struct SC_ADD_OBJECT_PACKET {
@@ -89,6 +90,7 @@ struct SC_MOVE_OBJECT_PACKET {
 	char	type;
 	int		id;
 	short	x, y;
+	char	direction;
 	unsigned int move_time;
 };
 
