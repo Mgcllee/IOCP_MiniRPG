@@ -39,8 +39,8 @@ bool checking_DB(char* p_name, short& c_id) {
 	SQLHDBC hdbc;
 	SQLHSTMT hstmt = 0;
 	SQLRETURN retcode;
-	SQLWCHAR Name[NAME_SIZE];
-	SQLINTEGER PosX, PosY, EXP;
+	SQLWCHAR Name[NAME_SIZE]{};
+	SQLINTEGER PosX{}, PosY{}, EXP{};
 	SQLLEN cbName = 0, cb_pos_x = 0, cb_pos_y = 0, cb_exp = 0;
 	setlocale(LC_ALL, "Korean");
 
@@ -80,8 +80,8 @@ bool checking_DB(char* p_name, short& c_id) {
 								c_buf.erase(remove(c_buf.begin(), c_buf.end(), ' '), c_buf.end());
 
 								if (strncmp(c_buf.c_str(), p_name, c_buf.length()) == 0) {
-									clients[c_id].x = PosX;
-									clients[c_id].y = PosY;
+									clients[c_id].x = (short)PosX;
+									clients[c_id].y = (short)PosY;
 									strncpy_s(clients[c_id]._name, c_buf.c_str(), c_buf.length());
 									clients[c_id].exp = EXP;
 									return true;
@@ -121,8 +121,8 @@ bool write_DB(int game_id, int pos_x, int pos_y) {
 	SQLHDBC hdbc;
 	SQLHSTMT hstmt = 0;
 	SQLRETURN retcode;
-	SQLWCHAR szName[NAME_SIZE];
-	SQLINTEGER user_id, POSITION_X, POSITION_Y;
+	SQLWCHAR szName[NAME_SIZE]{};
+	SQLINTEGER user_id{}, POSITION_X{}, POSITION_Y{};
 
 	SQLLEN cbName = 0, cb_pos_x = 0, cb_pos_y = 0, cb_id = 0;
 

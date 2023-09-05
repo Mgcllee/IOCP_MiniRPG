@@ -28,6 +28,19 @@
     </Image>
   </ItemGroup>
   <ItemGroup>
+    <None Include="sfml-graphics-2.dll" />
+    <None Include="sfml-window-2.dll" />
+    <None Include="sfml-audio-2.dll" />
+    <None Include="sfml-network-2.dll" />
+    <None Include="sfml-system-2.dll" />
+    <None Include="sfml-graphics-d-2.dll" />
+    <None Include="sfml-window-d-2.dll" />
+    <None Include="sfml-audio-d-2.dll" />
+    <None Include="sfml-network-d-2.dll" />
+    <None Include="sfml-system-d-2.dll" />
+    <None Include="SFML-2.6.0\bin\openal32.dll" />
+  </ItemGroup>
+  <ItemGroup>
     <Font Include="cour.ttf">
       <Filter>리소스 파일</Filter>
     </Font>

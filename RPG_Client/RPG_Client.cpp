@@ -1,25 +1,22 @@
-#define SFML_STATIC 1
 #include <SFML/Graphics.hpp>
 #include <SFML/Network.hpp>
+#include <SFML/Window.hpp>
 #include <iostream>
-#include <Windows.h>
 #include <array>
-#include <vector>
-#include <thread>
 using namespace std;
 
 #ifdef _DEBUG
-#pragma comment (lib, "lib/sfml-graphics-s-d.lib")
-#pragma comment (lib, "lib/sfml-window-s-d.lib")
-#pragma comment (lib, "lib/sfml-system-s-d.lib")
-#pragma comment (lib, "lib/sfml-network-s-d.lib")
-#pragma comment (lib, "lib/freetype.lib")
+#pragma comment (lib, "sfml-graphics-d.lib")
+#pragma comment (lib, "sfml-window-d.lib")
+#pragma comment (lib, "sfml-system-d.lib")
+#pragma comment (lib, "sfml-network-d.lib")
 #else
-#pragma comment (lib, "lib/sfml-graphics-s.lib")
-#pragma comment (lib, "lib/sfml-window-s.lib")
-#pragma comment (lib, "lib/sfml-system-s.lib")
-#pragma comment (lib, "lib/sfml-network-s.lib")
+#pragma comment (lib, "sfml-graphics.lib")
+#pragma comment (lib, "sfml-window.lib")
+#pragma comment (lib, "sfml-system.lib")
+#pragma comment (lib, "sfml-network.lib")
 #endif
+#pragma comment (lib, "freetype.lib")
 
 #pragma comment (lib, "opengl32.lib")
 #pragma comment (lib, "winmm.lib")
@@ -36,17 +33,13 @@ enum STAGE { TITLE, HOME };
 short current_stage = TITLE;
 
 sf::RenderWindow* g_window;
-
 sf::Clock anim_clock;
-
 sf::Font g_font;
 sf::Text text;
 sf::Texture* board;
 sf::Sprite m_sprite;
 string user_id = "\0";
-
 vector<sf::Text> chat_log;
-
 int MyId = -1;
 class PLAYER {
 public:
@@ -82,7 +75,6 @@ public:
 	short	x, y;
 };
 array<PLAYER, MAX_USER + MAX_NPC> players;
-
 sf::TcpSocket g_socket;
 
 void login_page();
@@ -176,7 +168,7 @@ void ProcessPacket(char* ptr)
 			players[MyId].s_max_hp.setFillColor(sf::Color::White);
 			players[MyId].s_max_hp.setPosition(sf::Vector2f(0.f, 660.f));
 
-			players[MyId].s_cur_hp = sf::RectangleShape(sf::Vector2f(players[MyId].hp, 20.f));
+			players[MyId].s_cur_hp = sf::RectangleShape(sf::Vector2f((float)players[MyId].hp, 20.f));
 			players[MyId].s_cur_hp.setFillColor(sf::Color::Red);
 			players[MyId].s_cur_hp.setPosition(sf::Vector2f(0.f, 660.f));
 
@@ -244,9 +236,10 @@ void ProcessPacket(char* ptr)
 		chat_log.push_back(t_buf);
 	}
 	break;
+	/*
 	case SC_ADD_OBJECT:
 	{
-		/*SC_ADD_OBJECT_PACKET* p = reinterpret_cast<SC_ADD_OBJECT_PACKET*>(ptr);
+		SC_ADD_OBJECT_PACKET* p = reinterpret_cast<SC_ADD_OBJECT_PACKET*>(ptr);
 		int new_id = p->id;
 
 		if (new_id != -1) {
@@ -270,9 +263,10 @@ void ProcessPacket(char* ptr)
 			players[new_id].move(p->x, p->y);
 			players[new_id].game_id = p->game_id;
 		}
-		break;*/
+		break;
 	}
 	break;
+	*/
 	}
 }
 
@@ -305,12 +299,16 @@ void login_page()
 {
 	// 언어 설정
 	wcout.imbue(locale("Korean"));
+	
 	// 아이디 입력을 위한 폰트 설정
-	g_font.loadFromFile("cour.ttf");
-	text.setFont(g_font);
-	text.setCharacterSize(60);
-	text.setPosition(190, 480);
-	text.setFillColor(sf::Color::Black);
+	if (g_font.loadFromFile("cour.ttf")) {
+		text.setFont(g_font);
+		text.setCharacterSize(60);
+		text.setPosition(190, 480);
+		text.setFillColor(sf::Color::Black);
+	}
+	else printf("failure load font!\n");
+	
 	// 배경 이미지 설정
 	board = new sf::Texture;
 	board->loadFromFile("texture\\title.png");
@@ -326,7 +324,7 @@ void main_page() {
 	for (int hei = 0; hei < MAX_HEI_TILE; ++hei) {
 		for (int wid = 0; wid < MAX_WID_TILE; ++wid) {
 			mapMgr.m_sprite[wid][hei].setTexture(*board);
-			mapMgr.m_sprite[wid][hei].setTextureRect(sf::IntRect(0, 0, TILE_SIZE, TILE_SIZE));
+			mapMgr.m_sprite[wid][hei].setTextureRect(sf::IntRect(0, 0, (int)TILE_SIZE, (int)TILE_SIZE));
 			mapMgr.m_sprite[wid][hei].setPosition(TILE_SIZE * wid, TILE_SIZE * hei);
 		}
 	}
@@ -399,19 +397,19 @@ void DrawMap(sf::RenderWindow& window) {
 				// player attack 02 animation
 				if (pl.b_attack02) {
 					if (anim_clock.getElapsedTime().asMilliseconds() > 100) {
-						pl.attack_frame_02 += 187.4;
+						pl.attack_frame_02 += 187.4f;
 
 						anim_clock.restart();
 						if (pl.attack_frame_02 > 749.6f && pl.attack_frame_02_y < 1100) {
 							pl.attack_frame_02 = 0;
-							pl.attack_frame_02_y += 184.4;
+							pl.attack_frame_02_y += 184.4f;
 						}
 						if (pl.attack_frame_02_y > 1100) {
 							pl.attack_frame_02 = 0;
 							pl.attack_frame_02_y = 0;
 							pl.b_attack02 = false;
 						}
-						pl.p_sprite_a02.setTextureRect(sf::IntRect(pl.attack_frame_02, pl.attack_frame_02_y, 187.4, 184.4));
+						pl.p_sprite_a02.setTextureRect(sf::IntRect((int)pl.attack_frame_02, (int)pl.attack_frame_02_y, (int)187.4, (int)184.4));
 					}
 					pl.p_sprite_a02.setPosition(TILE_SIZE * pl.x - 65, TILE_SIZE * pl.y - 47);
 					window.draw(pl.p_sprite_a02);
@@ -426,7 +424,7 @@ void DrawMap(sf::RenderWindow& window) {
 				pos_y -= 15;
 				if (pos_y < 490)
 					break;
-				t.setPosition(700, pos_y);
+				t.setPosition(700.f, (float)pos_y);
 				window.draw(t);
 			}
 			reverse(chat_log.begin(), chat_log.end());
@@ -555,7 +553,6 @@ int main()
 						p.type = CS_CHAT;
 						strcpy_s(p.mess, user_id.c_str());
 						send_packet(&p);
-
 						// 채팅창 지우기
 						user_id.clear();
 						text.setString(user_id);
@@ -568,7 +565,6 @@ int main()
 					if (current_stage == STAGE::HOME && false == players[MyId].b_attack01 && false == players[MyId].b_attack02) {
 						anim_clock.restart();
 						players[MyId].b_attack01 = true;
-
 						CS_TELEPORT_PACKET p;
 						p.size = sizeof(p);
 						p.type = CS_ATTACK;

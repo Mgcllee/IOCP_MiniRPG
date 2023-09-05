@@ -41,3 +41,6 @@ RPG_Client/x64/
 #Visual vcxproj
 *.user
 x64/
+RPG_Client/Debug
+RPG_Client/SFML-2.6.0
+*.bak
