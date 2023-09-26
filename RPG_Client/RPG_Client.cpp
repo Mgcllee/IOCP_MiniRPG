@@ -64,7 +64,7 @@ public:
 
 	sf::Text cur_level;
 
-	short direction = 2;
+	DIRECTION direction = DIRECTION::RIGHT;
 
 	char	name[NAME_SIZE];
 	int		id		= -1;
@@ -73,6 +73,38 @@ public:
 	int		exp		= -1;
 	int		level	= -1;
 	short	x, y;
+
+public:
+	PLAYER(int insert_id, bool mine) {
+		if (mine) {
+
+		}
+
+		for (int i = 0; i < 4; ++i) {
+			players[insert_id].p_texture[i] = new sf::Texture;
+			players[insert_id].p_texture[i]->loadFromFile("texture\\ChracterSprite.png");
+			players[insert_id].p_sprite[i].setTexture(*players[insert_id].p_texture[i]);
+			
+			if (mine) {
+				players[MyId].p_sprite[i].setTextureRect(sf::IntRect(0, 48 * i, 48, 48));
+			}
+			else {
+				players[insert_id].p_sprite[i].setTextureRect(sf::IntRect(290, 193 + 48 * i, 48, 48));
+			}
+		}
+
+		players[insert_id].p_sprite[players[insert_id].direction].setPosition(TILE_SIZE * players[insert_id].x, TILE_SIZE * players[insert_id].y);
+
+		players[insert_id].p_texture_a01 = new sf::Texture;
+		players[insert_id].p_texture_a01->loadFromFile("texture\\attack01.png");
+		players[insert_id].p_sprite_a01.setTexture(*players[insert_id].p_texture_a01);
+		players[insert_id].p_sprite_a01.setTextureRect(sf::IntRect(20, 30, 70, 70));
+				
+		players[insert_id].p_texture_a02 = new sf::Texture;
+		players[insert_id].p_texture_a02->loadFromFile("texture\\attack02.png");
+		players[insert_id].p_sprite_a02.setTexture(*players[insert_id].p_texture_a02);
+		players[insert_id].p_sprite_a02.setTextureRect(sf::IntRect(0, 0, 165, 180));
+	}
 };
 array<PLAYER, MAX_USER + MAX_NPC> players;
 sf::TcpSocket g_socket;
@@ -104,6 +136,24 @@ void network_module() {
 	}
 }
 
+void addNewChat(string msg) {
+	sf::Text t_buf;
+	t_buf.setFont(g_font);
+	t_buf.setCharacterSize(20);
+	t_buf.setFillColor(sf::Color::White);
+	t_buf.setString(msg);
+	chat_log.push_back(t_buf);
+}
+
+void moveObj(PLAYER& target, int newX, int newY, DIRECTION dir, int sprite) {
+	// players[other_id].p_sprite[players[other_id].direction].setPosition(TILE_SIZE * players[other_id].x, TILE_SIZE * players[other_id].y);
+
+	target.x = newX;
+	target.y = newY;
+	target.direction = dir;
+}
+
+
 void ProcessPacket(char* ptr)
 {
 	static bool first_time = true;
@@ -113,13 +163,13 @@ void ProcessPacket(char* ptr)
 	{
 		user_id.clear();
 		text.setString(user_id);
-		cout << "Fail Login\n";
+		printf("Fail Login\n");
 	}
 	break;
 	case SC_LOGIN_OK:
 	{
 		main_page();
-		cout << "Login OK\n";
+		printf("New Player Login!\n");
 	}
 	break;
 	case SC_LOGIN_INFO:
@@ -132,29 +182,12 @@ void ProcessPacket(char* ptr)
 			players[MyId].id		= MyId;
 			players[MyId].hp		= 190;
 			players[MyId].max_hp	= 200;
+			
 			players[MyId].exp		= static_cast<int>(p->exp);
 			players[MyId].level		= (int)(players[MyId].exp / 60) + 1;
 			players[MyId].x			= static_cast<short>(p->x);
 			players[MyId].y			= static_cast<short>(p->y);
 			strcpy_s(players[MyId].name, p->name);
-
-			for (int i = 0; i < 4; ++i) {
-				players[MyId].p_texture[i] = new sf::Texture;
-				players[MyId].p_texture[i]->loadFromFile("texture\\ChracterSprite.png");
-				players[MyId].p_sprite[i].setTexture(*players[MyId].p_texture[i]);
-				players[MyId].p_sprite[i].setTextureRect(sf::IntRect(0, 48 * i, 48, 48));
-			}
-			players[MyId].p_sprite[players[MyId].direction].setPosition(TILE_SIZE* players[MyId].x, TILE_SIZE* players[MyId].y);
-
-			players[MyId].p_texture_a01 = new sf::Texture;
-			players[MyId].p_texture_a01->loadFromFile("texture\\attack01.png");
-			players[MyId].p_sprite_a01.setTexture(*players[MyId].p_texture_a01);
-			players[MyId].p_sprite_a01.setTextureRect(sf::IntRect(20, 30, 70, 70));
-
-			players[MyId].p_texture_a02 = new sf::Texture;
-			players[MyId].p_texture_a02->loadFromFile("texture\\attack02.png");
-			players[MyId].p_sprite_a02.setTexture(*players[MyId].p_texture_a02);
-			players[MyId].p_sprite_a02.setTextureRect(sf::IntRect(0, 0, 165, 180));
 
 			players[MyId].s_max_exp = sf::RectangleShape(sf::Vector2f(600.f, 10.f));
 			players[MyId].s_max_exp.setFillColor(sf::Color::White);
@@ -185,31 +218,13 @@ void ProcessPacket(char* ptr)
 		else {
 			if (new_id != MyId && new_id >= 0) {
 				players[new_id].id = MyId;
-				players[new_id].hp = static_cast<int>(p->hp);
-				players[new_id].max_hp = static_cast<int>(p->max_hp);
-				players[new_id].exp = static_cast<int>(p->exp);
-				players[new_id].level = static_cast<int>(p->level);
-				players[new_id].x = static_cast<short>(p->x);
-				players[new_id].y = static_cast<short>(p->y);
+				players[new_id].hp =		static_cast<int>(p->hp);
+				players[new_id].max_hp =	static_cast<int>(p->max_hp);
+				players[new_id].exp =		static_cast<int>(p->exp);
+				players[new_id].level =		static_cast<int>(p->level);
+				players[new_id].x =			static_cast<short>(p->x);
+				players[new_id].y =			static_cast<short>(p->y);
 				strcpy_s(players[new_id].name, p->name);
-
-				for (int i = 0; i < 4; ++i) {
-					players[new_id].p_texture[i] = new sf::Texture;
-					players[new_id].p_texture[i]->loadFromFile("texture\\ChracterSprite.png");
-					players[new_id].p_sprite[i].setTexture(*players[MyId].p_texture[i]);
-					players[new_id].p_sprite[i].setTextureRect(sf::IntRect(290, 193 + 48 * i, 48, 48));
-				}
-				players[new_id].p_sprite[players[new_id].direction].setPosition(TILE_SIZE * players[new_id].x, TILE_SIZE * players[new_id].y);
-
-				players[new_id].p_texture_a01 = new sf::Texture;
-				players[new_id].p_texture_a01->loadFromFile("texture\\attack01.png");
-				players[new_id].p_sprite_a01.setTexture(*players[new_id].p_texture_a01);
-				players[new_id].p_sprite_a01.setTextureRect(sf::IntRect(20, 30, 70, 70));
-				
-				players[new_id].p_texture_a02 = new sf::Texture;
-				players[new_id].p_texture_a02->loadFromFile("texture\\attack02.png");
-				players[new_id].p_sprite_a02.setTexture(*players[new_id].p_texture_a02);
-				players[new_id].p_sprite_a02.setTextureRect(sf::IntRect(0, 0, 165, 180));
 			}
 		}
 	}
@@ -217,23 +232,13 @@ void ProcessPacket(char* ptr)
 	case SC_MOVE_OBJECT:
 	{
 		SC_MOVE_OBJECT_PACKET* p = reinterpret_cast<SC_MOVE_OBJECT_PACKET*>(ptr);
-		int other_id = p->id;
-		players[other_id].x = p->x;
-		players[other_id].y = p->y;
-		players[other_id].direction = p->direction;
-		players[other_id].p_sprite[players[other_id].direction].setPosition(TILE_SIZE * players[other_id].x, TILE_SIZE * players[other_id].y);
+		moveObj(players[p->id], p->x, p->y, p->direction, NULL);
 	}
 	break;
 	case SC_CHAT:
 	{
-		sf::Text t_buf;
 		SC_CHAT_PACKET* p = reinterpret_cast<SC_CHAT_PACKET*>(ptr);
-		
-		t_buf.setFont(g_font);
-		t_buf.setCharacterSize(20);
-		t_buf.setFillColor(sf::Color::White);
-		t_buf.setString(players[p->id].name + string(": ") + p->mess);
-		chat_log.push_back(t_buf);
+		addNewChat(players[p->id].name + string(": ") + p->mess);
 	}
 	break;
 	/*
@@ -270,25 +275,36 @@ void ProcessPacket(char* ptr)
 	}
 }
 
-void process_data(char* net_buf, size_t io_byte)
+void process_data(char* net_buf, size_t io_byte)	// net_buf: 수신한 정보, io_byte: 수신정보의 총 길이
 {
 	char* ptr = net_buf;
-	static size_t in_packet_size = 0;
-	static size_t saved_packet_size = 0;
-	static char packet_buffer[BUF_SIZE];
+
+	static size_t in_packet_size = 0;		// 패킷에 담긴 전체 길이 정보를 저장
+	static size_t saved_packet_size = 0;	// (32bit-4byte, 64bit-8byte)
+	static char packet_buffer[BUF_SIZE]{};
 
 	while (0 != io_byte) {
+		// 패킷의 첫 부분은 패킷의 길이 정보가 담겨져 있음
 		if (0 == in_packet_size) in_packet_size = ptr[0];
-		if (io_byte + saved_packet_size >= in_packet_size) {
-			memcpy(packet_buffer + saved_packet_size, ptr, in_packet_size - saved_packet_size);
+
+		if ((io_byte + saved_packet_size) >= in_packet_size) {
+			memcpy((packet_buffer + saved_packet_size), ptr, (in_packet_size - saved_packet_size));
+
+			// 수신된 패킷 처리.
 			ProcessPacket(packet_buffer);
-			ptr += in_packet_size - saved_packet_size;
-			io_byte -= in_packet_size - saved_packet_size;
+
+			// 패킷 내부 이동
+			ptr += (in_packet_size - saved_packet_size);
+
+			io_byte -= (in_packet_size - saved_packet_size);
+
 			in_packet_size = 0;
 			saved_packet_size = 0;
 		}
+		// 수신된 패킷의 처리가 완료됨(-> static(localScope)이므로 socpe가 종료되어도 변수가 유지됨.(프로그램 수명과 함께 끝난다.))
 		else {
 			memcpy(packet_buffer + saved_packet_size, ptr, io_byte);
+			
 			saved_packet_size += io_byte;
 			io_byte = 0;
 		}
@@ -338,22 +354,31 @@ void main_page() {
 
 void client_main() {
 	char net_buf[BUF_SIZE];
-	size_t	received;
+	size_t	received{};
 
 	auto recv_result = g_socket.receive(net_buf, BUF_SIZE, received);
+	
+	switch (recv_result) {
+	case sf::Socket::Disconnected:
+		printf("This Client is disconnect!\n");
+		exit(EXIT_FAILURE);
 
-	if (recv_result == sf::Socket::Error)
-	{
-		wcout << L"Recv 에러!";
-		exit(-1);
+		// return title menu
+
+		break;
+	case sf::Socket::Error:
+		printf("This Client is Error!\n");
+		exit(EXIT_FAILURE);
+		break;
+	case sf::Socket::Done:
+	case sf::Socket::NotReady:
+	case sf::Socket::Partial:
+
+		break;
 	}
-	if (recv_result == sf::Socket::Disconnected) {
-		wcout << L"Disconnected\n";
-		exit(-1);
-	}
+	
 	if (recv_result != sf::Socket::NotReady)
 		if (received > 0) process_data(net_buf, received);
-
 }
 
 void DrawMap(sf::RenderWindow& window) {
@@ -485,7 +510,7 @@ int main()
 						CS_MOVE_PACKET p;
 						p.size = sizeof(p);
 						p.type = CS_MOVE;
-						p.direction = players[MyId].direction = 0;
+						p.direction = players[MyId].direction = DIRECTION::DOWN;
 						send_packet(&p);
 					}
 				}
@@ -496,7 +521,7 @@ int main()
 						CS_MOVE_PACKET p;
 						p.size = sizeof(p);
 						p.type = CS_MOVE;
-						p.direction = players[MyId].direction = 1;
+						p.direction = players[MyId].direction = DIRECTION::LEFT;
 						send_packet(&p);
 					}
 				}
@@ -507,7 +532,7 @@ int main()
 						CS_MOVE_PACKET p;
 						p.size = sizeof(p);
 						p.type = CS_MOVE;
-						p.direction = players[MyId].direction = 2;
+						p.direction = players[MyId].direction = DIRECTION::RIGHT;
 						send_packet(&p);
 					}
 				}
@@ -518,18 +543,16 @@ int main()
 						CS_MOVE_PACKET p;
 						p.size = sizeof(p);
 						p.type = CS_MOVE;
-						p.direction = players[MyId].direction = 3;
+						p.direction = players[MyId].direction = DIRECTION::UP;
 						send_packet(&p);
 					}
 				}
 				break;
 				case sf::Keyboard::BackSpace:
+				if (!user_id.empty())
 				{
-					if (!user_id.empty())
-					{
-						user_id.pop_back();
-						text.setString(user_id);
-					}
+					user_id.pop_back();
+					text.setString(user_id);
 				}
 				break;
 				case sf::Keyboard::Space:
