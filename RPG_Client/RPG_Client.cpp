@@ -125,15 +125,19 @@ void send_packet(void* packet) {
 	g_socket.send(packet, p[0], sent);
 }
 
-void network_module() {
+bool network_module(string server_addr) {
 	cout << "working network module\n";
-	sf::Socket::Status status = g_socket.connect("127.0.0.1", PORT_NUM);
+	
+	sf::Socket::Status status = g_socket.connect(server_addr, PORT_NUM);
 	g_socket.setBlocking(false);
 
 	if (status != sf::Socket::Done) {
 		cout << "서버와 연결할 수 없습니다.\n";
 		g_window->close();
+		return false;
 	}
+
+	return true;
 }
 
 void addNewChat(string msg) {
@@ -311,25 +315,86 @@ void process_data(char* net_buf, size_t io_byte)	// net_buf: 수신한 정보, io_byt
 	}
 }
 
+
+/*
+[ToDo]
+1. font 등 환경설정 코드 분리
+2. 
+
+*/
+class OPTIONS {
+	
+public:
+	OPTIONS(string setting_language) 
+	{ 
+		//Default Option
+		setLanguage(setting_language);
+		setFont();
+
+		//Default Background
+		board = new sf::Texture;
+	}
+	~OPTIONS() { }
+
+
+	//Set client language and local
+	bool setLanguage(string lang)
+	{
+		//if set success what is return value
+		wcout.imbue(locale(lang));
+
+		//global language
+		// setlocale(LC_ALL, "");
+	}
+
+	bool setFont() {
+		if (g_font.loadFromFile("cour.ttf")) {
+			text.setFont(g_font);
+			text.setCharacterSize(60);
+			text.setPosition(190, 480);
+			text.setFillColor(sf::Color::Black);
+			return true;
+		}
+
+		printf("failure load font!\n");
+		return false;
+	}
+
+	bool setText(float x, float y, unsigned int size, sf::Color color, string cont = "")
+	{
+		//return false case
+
+		text.setPosition(x, y);
+		text.setCharacterSize(size);
+		text.setFillColor(color);
+		
+		if (false == cont.empty()) text.setString(cont);
+		else text.setString("");
+
+		return true;
+	}
+
+	void setBoard(string dirAndfName, sf::IntRect rect)
+	{
+		board->loadFromFile(dirAndfName);
+		m_sprite.setTexture(*board);
+		m_sprite.setTextureRect(rect);
+	}
+
+	void setStage(STAGE st)
+	{
+		current_stage = st;
+	}
+};
+OPTIONS options;
+
+// Add inf tile and background class
+
 void login_page() 
 {
-	// 언어 설정
-	wcout.imbue(locale("Korean"));
-	
-	// 아이디 입력을 위한 폰트 설정
-	if (g_font.loadFromFile("cour.ttf")) {
-		text.setFont(g_font);
-		text.setCharacterSize(60);
-		text.setPosition(190, 480);
-		text.setFillColor(sf::Color::Black);
-	}
-	else printf("failure load font!\n");
-	
 	// 배경 이미지 설정
-	board = new sf::Texture;
-	board->loadFromFile("texture\\title.png");
-	m_sprite.setTexture(*board);
-	m_sprite.setTextureRect(sf::IntRect(0, 0, 1000, 700));
+	options.setBoard("texture\\title.png", sf::IntRect(0, 0, 1000, 700));
+	options.setStage(STAGE::TITLE);
 }
 
 void main_page() {
@@ -346,10 +411,7 @@ void main_page() {
 	}
 
 	user_id.clear();
-	text.setFillColor(sf::Color::White);
-	text.setCharacterSize(20);
-	text.setPosition(720, 650);
-	text.setString(user_id);
+	options.setText(720, 650, 20, sf::Color::White, user_id);
 }
 
 void client_main() {
@@ -468,7 +530,7 @@ void DrawMap(sf::RenderWindow& window) {
 
 int main()
 {
-	network_module();
+	network_module("127.0.0.1");
 	login_page();
 
 	sf::RenderWindow window(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "User Name");
