@@ -8,6 +8,8 @@ SOCKET g_s_socket, g_c_socket;
 array<SESSION, MAX_USER + MAX_NPC> clients;
 OVER_EXP g_a_over;
 
+std::atomic_int new_client_id = -1;
+
 void process_packet(int c_id, char* packet) 
 {
 	switch (packet[1])
@@ -15,12 +17,13 @@ void process_packet(int c_id, char* packet)
 	case CS_LOGIN:
 	{
 		CS_LOGIN_PACKET* p = reinterpret_cast<CS_LOGIN_PACKET*>(packet);
-		cout << "input Login name: " << p->name << endl;
+		std::cout << "input Login name: " << p->name << endl;
 
-		short new_client_id = - 1;
-		if (checking_DB(p->name, new_client_id)) {
+		new_client_id++;
+		// if (checking_DB(p->name, new_client_id)) {
+		if (true) {
 			// Success Login
-			cout << "Success Login\n";
+			std::cout << "Success Login\n";
 			strncpy_s(clients[new_client_id]._name, p->name, strlen(p->name));
 
 			SC_LOGIN_OK_PACKET ok_p;
@@ -32,10 +35,10 @@ void process_packet(int c_id, char* packet)
 			info_p.size = sizeof(info_p);
 			info_p.type = SC_LOGIN_INFO;
 			info_p.id = new_client_id;
-			info_p.x = clients[new_client_id].x;
-			info_p.y = clients[new_client_id].y;
-			strcpy_s(info_p.name, clients[new_client_id]._name);
-			info_p.exp = clients[new_client_id].exp;
+			info_p.x = 0;
+			info_p.y = 0;
+			strcpy_s(info_p.name, p->name);
+			info_p.exp = 0;
 			info_p.max_hp = 600;
 			info_p.hp = 600;
 
@@ -57,7 +60,7 @@ void process_packet(int c_id, char* packet)
 		}
 		else {
 			// Fail Login and try Logout
-			cout << "Fail Loing\n";
+			std::cout << "Fail Loing\n";
 			SC_LOGIN_FAIL_PACKET p;
 			p.size = sizeof(p);
 			p.type = SC_LOGIN_FAIL;
@@ -67,37 +70,13 @@ void process_packet(int c_id, char* packet)
 	break;
 	case CS_MOVE:
 	{
-		CS_MOVE_PACKET* p = reinterpret_cast<CS_MOVE_PACKET*>(packet);
-		
-		short x = clients[c_id].x;
-		short y = clients[c_id].y;
-		switch (p->direction)
-		{
-		case DIRECTION::UP:		--y;	break;
-		case DIRECTION::LEFT:	--x;	break;
-		case DIRECTION::RIGHT:	++x;	break;
-		case DIRECTION::DOWN:	++y; 	break;
-		}
 
-		if (/*Collision*/false) {
-			
-		}
-		else {
-			clients[c_id].x = x;
-			clients[c_id].y = y;
-			clients[c_id].direction = p->direction;
-
-			for (SESSION& cl : clients) {
-				if(strcmp(cl._name, "empty") != 0)
-					cl.send_move_packet(c_id);
-			}
-		}
 	}
 	break;
 	case CS_CHAT:
 	{
 		CS_CHAT_PACKET* p = reinterpret_cast<CS_CHAT_PACKET*>(packet);
-		cout << p->mess << endl;
+		std::cout << p->mess << endl;
 
 		SC_CHAT_PACKET sc_chat_packet;
 		sc_chat_packet.size = sizeof(sc_chat_packet);
@@ -112,19 +91,7 @@ void process_packet(int c_id, char* packet)
 	break;
 	case CS_ATTACK:
 	{
-		for (SESSION& cl : clients) {
-			if (((cl.x == clients[c_id].x) && (cl.y == clients[c_id].y))
-				|| ((cl.x - 1== clients[c_id].x) && (cl.y == clients[c_id].y))
-				|| ((cl.x + 1== clients[c_id].x) && (cl.y == clients[c_id].y))
-				|| ((cl.x == clients[c_id].x) && (cl.y - 1 == clients[c_id].y))
-				|| ((cl.x == clients[c_id].x) && (cl.y + 1== clients[c_id].y))
-				|| ((cl.x + 1== clients[c_id].x) && (cl.y + 1== clients[c_id].y))
-				|| ((cl.x + 1== clients[c_id].x) && (cl.y - 1== clients[c_id].y))
-				|| ((cl.x - 1== clients[c_id].x) && (cl.y + 1== clients[c_id].y))
-				|| ((cl.x - 1== clients[c_id].x) && (cl.y - 1== clients[c_id].y))) {
-				// die
-			}
-		}
+		
 	}
 	break;
 	case CS_TELEPORT:
@@ -134,7 +101,7 @@ void process_packet(int c_id, char* packet)
 	break;
 	case CS_LOGOUT:
 	{
-		// Disconect Client
+		
 	}
 	break;
 	}
@@ -150,7 +117,7 @@ void worker_thread(HANDLE h_iocp) {
 
 		// error °ËÃâ±â
 		if (FALSE == ret) {
-			if (ex_over->c_type == ACCEPT) cout << "Accept Error";
+			if (ex_over->c_type == ACCEPT) std::cout << "Accept Error";
 			else continue;
 		}
 		if ((0 == num_bytes) && (ex_over->c_type == RECV)) continue;
@@ -168,10 +135,10 @@ void worker_thread(HANDLE h_iocp) {
 				CreateIoCompletionPort(reinterpret_cast<HANDLE>(g_c_socket), h_iocp, new_c_id, 0);
 				clients[new_c_id].do_recv();
 				g_c_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
-				cout << "Accept New Client" << endl;
+				std::cout << "Accept New Client" << endl;
 			}
 			else {
-				cout << "Accept Error" << endl;
+				std::cout << "Accept Error" << endl;
 			}
 			ZeroMemory(&g_a_over._over, sizeof(g_a_over._over));
 			int addr_size = sizeof(SOCKADDR_IN);

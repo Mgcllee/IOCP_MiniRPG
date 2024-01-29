@@ -11,13 +11,13 @@
 #include <concurrent_priority_queue.h>
 #include "protocol_2022.h"
 
-extern "C"
-{
-#include "include/lua.h"
-#include "include/lauxlib.h"
-#include "include/lualib.h"
-}
-#pragma comment (lib, "lua54.lib")
+//extern "C"
+//{
+//#include "include/lua.h"
+//#include "include/lauxlib.h"
+//#include "include/lualib.h"
+//}
+//#pragma comment (lib, "lua54.lib")
 
 #pragma comment(lib, "WS2_32.lib")
 #pragma comment(lib, "MSWSock.lib")
@@ -25,7 +25,7 @@ extern "C"
 using namespace std;
 
 enum TYPE		{ ACCEPT, RECV, SEND };
-enum DIRECTION	{ DOWN, LEFT, RIGHT, UP };
+// enum DIRECTION	{ DOWN, LEFT, RIGHT, UP };
 
 class OVER_EXP {
 public:

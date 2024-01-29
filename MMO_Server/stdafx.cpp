@@ -8,6 +8,6 @@ void SESSION::send_move_packet(int c_id)
 	p.type = SC_MOVE_OBJECT;
 	p.x = clients[c_id].x;
 	p.y = clients[c_id].y;
-	p.direction = clients[c_id].direction;
+	p.direction = (DIRECTION)clients[c_id].direction;
 	do_send(&p);
 }

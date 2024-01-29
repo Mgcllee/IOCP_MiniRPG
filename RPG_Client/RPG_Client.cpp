@@ -41,6 +41,7 @@ sf::Sprite m_sprite;
 string user_id = "\0";
 vector<sf::Text> chat_log;
 int MyId = -1;
+
 class PLAYER {
 public:
 	sf::Texture* p_texture[4];
@@ -75,12 +76,9 @@ public:
 	short	x, y;
 
 public:
+	PLAYER() { } 
 	PLAYER(int insert_id, bool mine) {
-		if (mine) {
-
-		}
-
-		for (int i = 0; i < 4; ++i) {
+		/*for (int i = 0; i < 4; ++i) {
 			players[insert_id].p_texture[i] = new sf::Texture;
 			players[insert_id].p_texture[i]->loadFromFile("texture\\ChracterSprite.png");
 			players[insert_id].p_sprite[i].setTexture(*players[insert_id].p_texture[i]);
@@ -103,7 +101,7 @@ public:
 		players[insert_id].p_texture_a02 = new sf::Texture;
 		players[insert_id].p_texture_a02->loadFromFile("texture\\attack02.png");
 		players[insert_id].p_sprite_a02.setTexture(*players[insert_id].p_texture_a02);
-		players[insert_id].p_sprite_a02.setTextureRect(sf::IntRect(0, 0, 165, 180));
+		players[insert_id].p_sprite_a02.setTextureRect(sf::IntRect(0, 0, 165, 180));*/
 	}
 };
 array<PLAYER, MAX_USER + MAX_NPC> players;
@@ -181,7 +179,8 @@ void ProcessPacket(char* ptr)
 		SC_LOGIN_INFO_PACKET* p = reinterpret_cast<SC_LOGIN_INFO_PACKET*>(ptr);
 		int new_id = int(p->id);
 
-		if (MyId == -1 && new_id >= 0) {
+		// if (MyId == -1 && new_id >= 0) {
+		if (MyId == -1) {
 			MyId = new_id;
 			players[MyId].id		= MyId;
 			players[MyId].hp		= 190;
@@ -220,7 +219,7 @@ void ProcessPacket(char* ptr)
 			players[MyId].cur_level.setString(string("Level: ").append(view_level));
 		}
 		else {
-			if (new_id != MyId && new_id >= 0) {
+			if (new_id != MyId) {
 				players[new_id].id = MyId;
 				players[new_id].hp =		static_cast<int>(p->hp);
 				players[new_id].max_hp =	static_cast<int>(p->max_hp);
@@ -245,37 +244,6 @@ void ProcessPacket(char* ptr)
 		addNewChat(players[p->id].name + string(": ") + p->mess);
 	}
 	break;
-	/*
-	case SC_ADD_OBJECT:
-	{
-		SC_ADD_OBJECT_PACKET* p = reinterpret_cast<SC_ADD_OBJECT_PACKET*>(ptr);
-		int new_id = p->id;
-
-		if (new_id != -1) {
-			players[new_id].id = new_id;
-			players[new_id].hp = static_cast<int>(p->hp);
-			players[new_id].max_hp = static_cast<int>(p->max_hp);
-			players[new_id].exp = static_cast<int>(p->exp);
-			players[new_id].level = static_cast<int>(p->level);
-			players[new_id].x = static_cast<short>(p->x);
-			players[new_id].y = static_cast<short>(p->y);
-		}
-		players[new_id].
-
-		if (new_id == g_myid) {
-			avatar.move(p->x, p->y);
-			g_left_x = p->x - 7;
-			g_top_y = p->y - 7;
-		}
-		else if (new_id < MAX_USER) {
-			players[new_id].show();
-			players[new_id].move(p->x, p->y);
-			players[new_id].game_id = p->game_id;
-		}
-		break;
-	}
-	break;
-	*/
 	}
 }
 
@@ -315,16 +283,17 @@ void process_data(char* net_buf, size_t io_byte)	// net_buf: 수신한 정보, io_byt
 	}
 }
 
-
-/*
-[ToDo]
-1. font 등 환경설정 코드 분리
-2. 
-
-*/
 class OPTIONS {
-	
 public:
+	OPTIONS() 
+	{ 
+		//Default Option
+		setLanguage("korean");
+		setFont();
+
+		//Default Background
+		board = new sf::Texture;
+	}
 	OPTIONS(string setting_language) 
 	{ 
 		//Default Option
@@ -345,6 +314,7 @@ public:
 
 		//global language
 		// setlocale(LC_ALL, "");
+		return true;
 	}
 
 	bool setFont() {
