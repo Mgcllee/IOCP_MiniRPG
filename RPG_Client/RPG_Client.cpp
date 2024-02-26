@@ -36,7 +36,7 @@ sf::RenderWindow* g_window;
 sf::Clock anim_clock;
 sf::Font g_font;
 sf::Text text;
-sf::Texture* board;
+sf::Texture* board; 
 sf::Sprite m_sprite;
 string user_id = "\0";
 vector<sf::Text> chat_log;
