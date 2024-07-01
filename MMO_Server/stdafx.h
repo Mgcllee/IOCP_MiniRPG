@@ -27,14 +27,18 @@ using namespace std;
 enum TYPE		{ ACCEPT, RECV, SEND };
 // enum DIRECTION	{ DOWN, LEFT, RIGHT, UP };
 
+// 용도 확인
 class OVER_EXP {
 public:
-	WSAOVERLAPPED _over;
-	WSABUF _wsabuf;
-	char _send_buf[BUF_SIZE];
-	TYPE c_type = RECV;
+	WSAOVERLAPPED _over;		// : WSAOVERLAPPED, OVERLAPPED 확인 필요
+	WSABUF _wsabuf;				// : WSABUF 확인 필요
+
+	char _send_buf[BUF_SIZE];	// 패킷 크기
+	TYPE c_type = RECV;			// 패킷 타입
+	
 	int _ai_target_obj;
 
+	// 패킷 없이 생성
 	OVER_EXP()
 	{
 		_wsabuf.len = BUF_SIZE;
@@ -42,6 +46,8 @@ public:
 		c_type = RECV;
 		ZeroMemory(&_over, sizeof(_over));
 	}
+
+	// 패킷 받으며 생성
 	OVER_EXP(char* packet)
 	{
 		_wsabuf.len = packet[0];
