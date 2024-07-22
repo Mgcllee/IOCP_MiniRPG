@@ -2,7 +2,7 @@
 #include "stdafx.h"
 #include "DatabaseMgr.h"
 
-HANDLE h_iocp;
+HANDLE h_iocp; // IOCP Handle 객체
 SOCKET g_s_socket, g_c_socket;
 
 array<SESSION, MAX_USER + MAX_NPC> clients;
@@ -108,20 +108,51 @@ void process_packet(int c_id, char* packet)
 }
 
 void worker_thread(HANDLE h_iocp) {
+
+	/*
+	GetQueuedCompletionStatus 함수에서 작업을 가져와서 진행하므로
+	worker_thread에서 아래의 반복문을 무한으로 반복한다.
+	*/
+
 	while (true) {
 		DWORD num_bytes;
 		ULONG_PTR key;
 		WSAOVERLAPPED* over = nullptr;
-		BOOL ret = GetQueuedCompletionStatus(h_iocp, &num_bytes, &key, &over, INFINITE);
+
+		// IOCP의 I/O Completion Queue에서 데이터가 입력될 때까지 [[무한 대기]] 합니다.
+		BOOL ret
+			= GetQueuedCompletionStatus(
+				h_iocp,		// 대기중인 iocp 객체
+				&num_bytes,	// 송/수신된 Byte 수
+				&key,		// 
+				&over,		// OVERLAPPED 객체 (WSAOVERLAPPED 구조체와 같다.)
+				INFINITE	// 무한 대기
+			);
+		
+		/*
+		- GetQueuedCompletionStatus function() -
+		1. [CompletionPort] : 대기를 수행할 IOCP 핸들
+		2. [lpNumberOfBytesTransferred] : 송/수신된 Byte 수
+		3. [lpCompletionKey] : 비동기 I/O 요청이 발생한 디바이스의 CompletionKey
+		4. [lpOverlapped] : 비동기 호출시 전달한 Overlapped 구조체 주소
+		5. [dwMilliseconds] : 대기를 수행할 시간(ms)
+		
+		반환 값이 true이면 성공, false이면 실패
+		*/
+		
 		OVER_EXP* ex_over = reinterpret_cast<OVER_EXP*>(over);
 
-		// error 검출기
 		if (FALSE == ret) {
+			// Queue에 작업이 있으나, 유효하게 꺼내오지 못 하였다.
+			// (작업이 없으면 GetQueuedCompletionStatus 함수 자체에서 대기함.
+			// 즉, 작업이 있었기에 ret 변수로 값이 반환된 것.)
+
 			if (ex_over->c_type == ACCEPT) std::cout << "Accept Error";
 			else continue;
 		}
 		if ((0 == num_bytes) && (ex_over->c_type == RECV)) continue;
 
+		// 정삭적으로 Queue에서 꺼내진 작업
 		switch (ex_over->c_type)
 		{
 		case ACCEPT:
@@ -188,8 +219,29 @@ int main()
 	SOCKADDR_IN cl_addr;
 	int addr_size = sizeof(cl_addr);
 
-	h_iocp = CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 0);
-	CreateIoCompletionPort(reinterpret_cast<HANDLE>(g_s_socket), h_iocp, 9999, 0);
+	h_iocp
+		= CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 0);
+
+	/* 
+	- CreateIoCompletionPort Function() -
+		1. [FileHandle] : IOCP와 연결할 디바이스 핸들 or INVALID_HANDLE_VALUE
+		2. [ExistingCompletionPort] : FileHandle과 연결할 IOCP 핸들을 전달,
+								INVALID_HANDLE_VALUE 값이라면 NULL 전달
+		3. [CompletionKey] : 연결할 디바이스 장비에 고유 키 등록, IO Queue에서 해당 키로 구분
+		4. [NumberOfConcurrentThreads] : IOCP 핸들을 생성할 때만 사용.
+
+		  i) 2번 변수가 NULL이면 새로운 IOCP 객체를 반환
+		 ii) 1번과 2번 변수가 유효한 값이 있는 경우, 연동된 IOCP 핸들 반환
+		iii) 반환 값이 NULL 이라면 GetLastError() 함수로 오류 확인 필요
+	*/ 
+
+	CreateIoCompletionPort(
+		// g_s_socket 객체를 h_iocp와 연결.
+		// 키 값으로는 9999 전달.
+		reinterpret_cast<HANDLE>(g_s_socket), h_iocp, 9999, 0
+	);
+	
+	
 	g_c_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
 	g_a_over.c_type = ACCEPT;
 
