@@ -2,22 +2,13 @@
 
 #include "stdafx.h"
 
-constexpr auto MAX_WID_TILE = 50;
-constexpr auto MAX_HEI_TILE = 50;
-constexpr auto WINDOW_WIDTH = 1000;
-constexpr auto WINDOW_HEIGHT = 700;
-
 enum STAGE { TITLE, HOME };
 short current_stage = TITLE;
 
-sf::RenderWindow* g_window;
-sf::Clock anim_clock;
-sf::Font g_font;
-sf::Text text;
-sf::Texture* board;
+
+
 sf::Sprite m_sprite;
 string user_id = "\0";
-vector<sf::Text> chat_log;
 int MyId = -1;
 
 array<PLAYER, MAX_USER + MAX_NPC> players;
@@ -29,105 +20,6 @@ public:
 	sf::Sprite m_sprite[MAX_WID_TILE][MAX_HEI_TILE];
 };
 MAPMgr mapMgr;
-
-class OPTIONS {
-public:
-	OPTIONS()
-	{
-		//Default Option
-		setLanguage("korean");
-		setFont();
-
-		//Default Background
-		board = new sf::Texture;
-	}
-	OPTIONS(string setting_language)
-	{
-		//Default Option
-		setLanguage(setting_language);
-		setFont();
-
-		//Default Background
-		board = new sf::Texture;
-	}
-	~OPTIONS() {}
-
-
-	//Set client language and local
-	bool setLanguage(string lang)
-	{
-		//if set success what is return value
-		wcout.imbue(locale(lang));
-
-		//global language
-		// setlocale(LC_ALL, "");
-		return true;
-	}
-
-	bool setFont() {
-		if (g_font.loadFromFile("cour.ttf")) {
-			text.setFont(g_font);
-			text.setCharacterSize(60);
-			text.setPosition(190, 480);
-			text.setFillColor(sf::Color::Black);
-			return true;
-		}
-
-		printf("failure load font!\n");
-		return false;
-	}
-
-	bool setText(float x, float y, unsigned int size, sf::Color color, string cont = "")
-	{
-		//return false case
-
-		text.setPosition(x, y);
-		text.setCharacterSize(size);
-		text.setFillColor(color);
-
-		if (false == cont.empty()) text.setString(cont);
-		else text.setString("");
-
-		return true;
-	}
-
-	void setBoard(string dirAndfName, sf::IntRect rect)
-	{
-		board->loadFromFile(dirAndfName);
-		m_sprite.setTexture(*board);
-		m_sprite.setTextureRect(rect);
-	}
-
-	void setStage(STAGE st)
-	{
-		current_stage = st;
-	}
-};
-OPTIONS options;
-
-void login_page()
-{
-	// 배경 이미지 설정
-	options.setBoard("texture\\title.png", sf::IntRect(0, 0, 1000, 700));
-	options.setStage(STAGE::TITLE);
-}
-
-void main_page() {
-	current_stage = STAGE::HOME;
-
-	board->loadFromFile("texture\\tileSprite.png");
-
-	for (int hei = 0; hei < MAX_HEI_TILE; ++hei) {
-		for (int wid = 0; wid < MAX_WID_TILE; ++wid) {
-			mapMgr.m_sprite[wid][hei].setTexture(*board);
-			mapMgr.m_sprite[wid][hei].setTextureRect(sf::IntRect(0, 0, (int)TILE_SIZE, (int)TILE_SIZE));
-			mapMgr.m_sprite[wid][hei].setPosition(TILE_SIZE * wid, TILE_SIZE * hei);
-		}
-	}
-
-	user_id.clear();
-	options.setText(720, 650, 20, sf::Color::White, user_id);
-}
 
 void client_main() {
 	char net_buf[BUF_SIZE];

@@ -24,7 +24,7 @@ public:
 	sf::RectangleShape s_cur_exp;
 
 	sf::Text cur_level;
-
+		
 	DIRECTION direction = DIRECTION::RIGHT;
 
 	char	name[NAME_SIZE];
@@ -62,5 +62,68 @@ public:
 		players[insert_id].p_texture_a02->loadFromFile("texture\\attack02.png");
 		players[insert_id].p_sprite_a02.setTexture(*players[insert_id].p_texture_a02);
 		players[insert_id].p_sprite_a02.setTextureRect(sf::IntRect(0, 0, 165, 180));*/
+
+		SC_LOGIN_INFO_PACKET* p = reinterpret_cast<SC_LOGIN_INFO_PACKET*>(ptr);
+		int new_id = int(p->id);
+
+		// if (MyId == -1 && new_id >= 0) {
+		if (MyId == -1) {
+			MyId = new_id;
+			players[MyId].id = MyId;
+			players[MyId].hp = 190;
+			players[MyId].max_hp = 200;
+
+			players[MyId].exp = static_cast<int>(p->exp);
+			players[MyId].level = (int)(players[MyId].exp / 60) + 1;
+			players[MyId].x = static_cast<short>(p->x);
+			players[MyId].y = static_cast<short>(p->y);
+			strcpy_s(players[MyId].name, p->name);
+
+			players[MyId].s_max_exp = sf::RectangleShape(sf::Vector2f(600.f, 10.f));
+			players[MyId].s_max_exp.setFillColor(sf::Color::White);
+			players[MyId].s_max_exp.setPosition(sf::Vector2f(0.f, 685.f));
+
+			players[MyId].s_cur_exp = sf::RectangleShape(sf::Vector2f((float)(players[MyId].exp % 60) * 10.f, 10.f));
+			players[MyId].s_cur_exp.setFillColor(sf::Color::Yellow);
+			players[MyId].s_cur_exp.setPosition(sf::Vector2f(0.f, 685.f));
+
+			players[MyId].s_max_hp = sf::RectangleShape(sf::Vector2f(200.f, 20.f));
+			players[MyId].s_max_hp.setFillColor(sf::Color::White);
+			players[MyId].s_max_hp.setPosition(sf::Vector2f(0.f, 660.f));
+
+			players[MyId].s_cur_hp = sf::RectangleShape(sf::Vector2f((float)players[MyId].hp, 20.f));
+			players[MyId].s_cur_hp.setFillColor(sf::Color::Red);
+			players[MyId].s_cur_hp.setPosition(sf::Vector2f(0.f, 660.f));
+
+			string view_level = "0";
+			view_level[0] += players[MyId].level;
+			players[MyId].cur_level.setFont(g_font);
+			players[MyId].cur_level.setCharacterSize(40);
+			players[MyId].cur_level.setPosition(10, 10);
+			players[MyId].cur_level.setFillColor(sf::Color::White);
+			players[MyId].cur_level.setOutlineColor(sf::Color::Black);
+			players[MyId].cur_level.setOutlineThickness(2.f);
+			players[MyId].cur_level.setString(string("Level: ").append(view_level));
+		}
+		else {
+			if (new_id != MyId) {
+				players[new_id].id = MyId;
+				players[new_id].hp = static_cast<int>(p->hp);
+				players[new_id].max_hp = static_cast<int>(p->max_hp);
+				players[new_id].exp = static_cast<int>(p->exp);
+				players[new_id].level = static_cast<int>(p->level);
+				players[new_id].x = static_cast<short>(p->x);
+				players[new_id].y = static_cast<short>(p->y);
+				strcpy_s(players[new_id].name, p->name);
+			}
+		}
+	}
+
+	void moveObj(PLAYER& target, int newX, int newY, DIRECTION dir, int sprite) {
+		// players[other_id].p_sprite[players[other_id].direction].setPosition(TILE_SIZE * players[other_id].x, TILE_SIZE * players[other_id].y);
+
+		target.x = newX;
+		target.y = newY;
+		target.direction = dir;
 	}
 };
